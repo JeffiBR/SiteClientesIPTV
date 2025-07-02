@@ -10,7 +10,7 @@ logger = logging.getLogger(__name__)
 
 class GitHubStorage:
     def __init__(self):
-        self.token = os.getenv('GITHUB_TOKEN')
+        self.token = os.getenv('CL_TOKEN')
         self.repo_owner = 'JeffiBR'
         self.repo_name = 'Clientes'
         self.base_url = f'https://api.github.com/repos/{self.repo_owner}/{self.repo_name}/contents'
