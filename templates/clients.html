@@ -1,0 +1,164 @@
+{% extends "base.html" %}
+
+{% block title %}Clientes - Bot Cliente Manager{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h1>
+                <i class="bi bi-people"></i>
+                Clientes
+            </h1>
+            <a href="{{ url_for('add_client') }}" class="btn btn-primary">
+                <i class="bi bi-plus-circle"></i>
+                Adicionar Cliente
+            </a>
+        </div>
+    </div>
+</div>
+
+{% if clients %}
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-striped" id="clientsTable">
+                        <thead>
+                            <tr>
+                                <th>Cliente</th>
+                                <th class="d-none d-md-table-cell">Telefone</th>
+                                <th>Plano</th>
+                                <th class="d-none d-lg-table-cell">Valor</th>
+                                <th class="d-none d-md-table-cell">Vencimento</th>
+                                <th>Status</th>
+                                <th class="d-none d-lg-table-cell">Dias</th>
+                                <th>Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for client in clients %}
+                            <tr>
+                                <td>
+                                    <div>
+                                        <strong>{{ client.name }}</strong>
+                                        <div class="d-md-none">
+                                            <small class="text-muted">
+                                                <i class="bi bi-whatsapp"></i> {{ client.phone }}
+                                            </small>
+                                        </div>
+                                        <div class="d-lg-none">
+                                            <small class="text-muted">R$ {{ "%.2f"|format(client.value) }}</small>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td class="d-none d-md-table-cell">
+                                    <i class="bi bi-whatsapp text-success"></i>
+                                    {{ client.phone }}
+                                </td>
+                                <td>
+                                    <span class="badge bg-{{ 'info' if client.plan_type == 'IPTV' else 'secondary' }}">
+                                        {{ client.plan_type }}
+                                    </span>
+                                    <div class="d-md-none">
+                                        <small class="text-muted">{{ client.plan_duration }}</small>
+                                    </div>
+                                </td>
+                                <td class="d-none d-lg-table-cell">R$ {{ "%.2f"|format(client.value) }}</td>
+                                <td class="d-none d-md-table-cell">
+                                    <span class="text-muted">
+                                        {{ client.plan_duration }}
+                                    </span>
+                                </td>
+                                <td>
+                                    {% if client.status == 'ativo' %}
+                                        <span class="badge bg-success">Ativo</span>
+                                    {% elif client.status == 'vencendo' %}
+                                        <span class="badge bg-warning">Vencendo</span>
+                                    {% else %}
+                                        <span class="badge bg-danger">Expirado</span>
+                                    {% endif %}
+                                    <div class="d-lg-none">
+                                        <small class="text-{{ 'success' if client.days_until_expiration > 3 else 'warning' if client.days_until_expiration > 0 else 'danger' }}">
+                                            {{ client.days_until_expiration }} d
+                                        </small>
+                                    </div>
+                                </td>
+                                <td class="d-none d-lg-table-cell">
+                                    {% if client.days_until_expiration >= 0 %}
+                                        <span class="text-{{ 'success' if client.days_until_expiration > 3 else 'warning' if client.days_until_expiration > 0 else 'danger' }}">
+                                            {{ client.days_until_expiration }} dias
+                                        </span>
+                                    {% else %}
+                                        <span class="text-danger">
+                                            {{ client.days_until_expiration|abs }} dias atraso
+                                        </span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <div class="btn-group btn-group-sm" role="group">
+                                        <a href="{{ url_for('edit_client', client_id=client.id) }}" 
+                                           class="btn btn-outline-warning" title="Editar">
+                                            <i class="bi bi-pencil"></i>
+                                        </a>
+                                        <button type="button" class="btn btn-outline-danger" 
+                                                onclick="confirmDelete('{{ client.id }}', '{{ client.name }}')" 
+                                                title="Excluir">
+                                            <i class="bi bi-trash"></i>
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% else %}
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-body text-center">
+                <i class="bi bi-people fs-1 text-muted"></i>
+                <h3 class="text-muted">Nenhum cliente cadastrado</h3>
+                <p class="text-muted">Comece adicionando seu primeiro cliente</p>
+                <a href="{{ url_for('add_client') }}" class="btn btn-primary">
+                    <i class="bi bi-plus-circle"></i>
+                    Adicionar Primeiro Cliente
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<!-- Delete Confirmation Modal -->
+<div class="modal fade" id="deleteModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Confirmar Exclusão</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p>Tem certeza que deseja excluir o cliente <strong id="clientName"></strong>?</p>
+                <p class="text-danger">Esta ação não pode ser desfeita.</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <form id="deleteForm" method="POST" style="display: inline;">
+                    <button type="submit" class="btn btn-danger">Excluir</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/clients.js') }}"></script>
+{% endblock %}

@@ -1,0 +1,147 @@
+{% extends "base.html" %}
+
+{% block title %}Mensagens - Bot Cliente Manager{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <h1 class="mb-4">
+            <i class="bi bi-chat-text"></i>
+            Templates de Mensagens
+        </h1>
+    </div>
+</div>
+
+<!-- Add New Template -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5><i class="bi bi-plus-circle"></i> Adicionar Novo Template</h5>
+            </div>
+            <div class="card-body">
+                <form method="POST" action="{{ url_for('add_message_template') }}">
+                    <div class="row">
+                        <div class="col-md-4">
+                            <label for="name" class="form-label">Nome do Template</label>
+                            <input type="text" class="form-control" id="name" name="name" required>
+                        </div>
+                        <div class="col-md-3">
+                            <label for="type" class="form-label">Tipo</label>
+                            <select class="form-select" id="type" name="type" required>
+                                <option value="">Selecione</option>
+                                <option value="3days">Lembrete 3 Dias</option>
+                                <option value="payment">Dia do Pagamento</option>
+                            </select>
+                        </div>
+                        <div class="col-md-5">
+                            <label for="content" class="form-label">Conteúdo da Mensagem</label>
+                            <div class="input-group">
+                                <textarea class="form-control" id="content" name="content" 
+                                          placeholder="Use {name}, {plan_type}, {value}, {payment_day}" required></textarea>
+                                <button type="submit" class="btn btn-primary">
+                                    <i class="bi bi-plus"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row mt-2">
+                        <div class="col-12">
+                            <small class="text-muted">
+                                Variáveis disponíveis: {name}, {plan_type}, {value}, {payment_day}
+                            </small>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Templates List -->
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5><i class="bi bi-list"></i> Templates Disponíveis</h5>
+            </div>
+            <div class="card-body">
+                {% if templates %}
+                    <div class="row">
+                        {% for template in templates %}
+                        <div class="col-md-6 mb-3">
+                            <div class="card h-100">
+                                <div class="card-header d-flex justify-content-between align-items-center">
+                                    <h6 class="mb-0">{{ template.name }}</h6>
+                                    <div>
+                                        <span class="badge bg-{{ 'warning' if template.type == '3days' else 'danger' }} me-2">
+                                            {{ 'Lembrete 3 Dias' if template.type == '3days' else 'Dia do Pagamento' }}
+                                        </span>
+                                        {% if not template.id.startswith('default_') %}
+                                        <form method="POST" action="{{ url_for('delete_message_template', template_id=template.id) }}" 
+                                              style="display: inline;" onsubmit="return confirm('Tem certeza que deseja excluir este template?')">
+                                            <button type="submit" class="btn btn-sm btn-outline-danger" title="Excluir">
+                                                <i class="bi bi-trash"></i>
+                                            </button>
+                                        </form>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                                <div class="card-body">
+                                    <p class="card-text">{{ template.content }}</p>
+                                    {% if template.id.startswith('default_') %}
+                                        <small class="text-muted">
+                                            <i class="bi bi-info-circle"></i>
+                                            Template padrão do sistema
+                                        </small>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    <div class="text-center text-muted">
+                        <i class="bi bi-chat-text fs-1"></i>
+                        <h3>Nenhum template personalizado</h3>
+                        <p>Os templates padrão estão sendo utilizados</p>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Help Section -->
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5><i class="bi bi-question-circle"></i> Como Usar</h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <h6>Variáveis Disponíveis:</h6>
+                        <ul>
+                            <li><code>{name}</code> - Nome do cliente</li>
+                            <li><code>{plan_type}</code> - Tipo do plano (IPTV/VPN)</li>
+                            <li><code>{value}</code> - Valor do plano</li>
+                            <li><code>{payment_day}</code> - Dia do pagamento</li>
+                        </ul>
+                    </div>
+                    <div class="col-md-6">
+                        <h6>Exemplo de Mensagem:</h6>
+                        <div class="bg-light p-3 rounded">
+                            <code>
+                                Olá {name}! Seu plano {plan_type} no valor de R$ {value} vence no dia {payment_day}. 
+                                Não esqueça de renovar!
+                            </code>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

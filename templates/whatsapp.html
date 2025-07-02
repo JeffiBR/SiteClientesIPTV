@@ -1,0 +1,204 @@
+{% extends "base.html" %}
+
+{% block title %}WhatsApp - Bot Cliente Manager{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <h1 class="mb-4">
+            <i class="bi bi-whatsapp"></i>
+            Conexão WhatsApp
+        </h1>
+    </div>
+</div>
+
+<!-- Connection Status -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h5>Status da Conexão</h5>
+                        {% if connected %}
+                            <span class="badge bg-success fs-6">
+                                <i class="bi bi-check-circle"></i>
+                                Conectado
+                            </span>
+                            <p class="text-muted mt-2">WhatsApp está conectado e pronto para enviar mensagens.</p>
+                        {% else %}
+                            <span class="badge bg-danger fs-6">
+                                <i class="bi bi-x-circle"></i>
+                                Desconectado
+                            </span>
+                            <p class="text-muted mt-2">Escaneie o QR Code abaixo para conectar o WhatsApp.</p>
+                        {% endif %}
+                    </div>
+                    <div>
+                        {% if connected %}
+                            <form method="POST" action="{{ url_for('whatsapp_disconnect') }}" style="display: inline;">
+                                <button type="submit" class="btn btn-outline-danger">
+                                    <i class="bi bi-power"></i>
+                                    Desconectar
+                                </button>
+                            </form>
+                        {% else %}
+                            <div class="d-flex gap-2">
+                                <form method="POST" action="{{ url_for('whatsapp_connect') }}" style="display: inline;">
+                                    <div class="form-check mb-2">
+                                        <input class="form-check-input" type="checkbox" id="keepConnected" name="keep_connected" checked>
+                                        <label class="form-check-label" for="keepConnected">
+                                            Manter conectado
+                                        </label>
+                                    </div>
+                                    <button type="submit" class="btn btn-success">
+                                        <i class="bi bi-check-circle"></i>
+                                        Conectar WhatsApp
+                                    </button>
+                                </form>
+                            </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- QR Code Section -->
+{% if not connected and qr_code %}
+<div class="row mb-4">
+    <div class="col-md-6 mx-auto">
+        <div class="card">
+            <div class="card-header text-center">
+                <h5><i class="bi bi-qr-code"></i> QR Code para Conexão</h5>
+            </div>
+            <div class="card-body text-center">
+                <div class="mb-3">
+                    <img src="{{ qr_code }}" alt="QR Code WhatsApp" class="img-fluid" style="max-width: 300px;">
+                </div>
+                <div class="alert alert-info">
+                    <h6><i class="bi bi-info-circle"></i> Como Conectar:</h6>
+                    <ol class="text-start">
+                        <li>Abra o WhatsApp no seu celular</li>
+                        <li>Vá em <strong>Configurações > Dispositivos conectados</strong></li>
+                        <li>Toque em <strong>Conectar um dispositivo</strong></li>
+                        <li>Escaneie este QR Code</li>
+                        <li>Clique em "Marcar como Conectado" após escanear</li>
+                    </ol>
+                </div>
+                <button onclick="window.location.reload()" class="btn btn-outline-primary">
+                    <i class="bi bi-arrow-clockwise"></i>
+                    Atualizar QR Code
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<!-- Instructions -->
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5><i class="bi bi-info-circle"></i> Informações Importantes</h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <h6>Recursos Disponíveis:</h6>
+                        <ul>
+                            <li>Envio automático de lembretes</li>
+                            <li>Mensagens personalizadas por cliente</li>
+                            <li>Agendamento de horários específicos</li>
+                            <li>Integração com dashboard de clientes</li>
+                        </ul>
+                    </div>
+                    <div class="col-md-6">
+                        <h6>Requisitos:</h6>
+                        <ul>
+                            <li>WhatsApp instalado no celular</li>
+                            <li>Conexão com internet estável</li>
+                            <li>Celular deve permanecer conectado</li>
+                            <li>Número válido para envio de mensagens</li>
+                        </ul>
+                    </div>
+                </div>
+                
+                <div class="alert alert-warning mt-3">
+                    <h6><i class="bi bi-exclamation-triangle"></i> Importante:</h6>
+                    <p class="mb-0">
+                        Mantenha seu celular conectado à internet para que os lembretes sejam enviados corretamente. 
+                        Se a conexão for perdida, será necessário escanear o QR Code novamente.
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Test Message Section -->
+{% if connected %}
+<div class="row mt-4">
+    <div class="col-md-8 mx-auto">
+        <div class="card">
+            <div class="card-header">
+                <h5><i class="bi bi-send"></i> Testar Envio de Mensagem</h5>
+            </div>
+            <div class="card-body">
+                <form id="testMessageForm">
+                    <div class="mb-3">
+                        <label for="testPhone" class="form-label">Número de Teste</label>
+                        <input type="tel" class="form-control" id="testPhone" 
+                               placeholder="Ex: 5511999999999" required>
+                        <div class="form-text">Formato: código do país + DDD + número</div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="testMessage" class="form-label">Mensagem de Teste</label>
+                        <textarea class="form-control" id="testMessage" rows="3" 
+                                  placeholder="Digite uma mensagem de teste..." required></textarea>
+                    </div>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="bi bi-send"></i>
+                        Enviar Teste
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Auto-refresh QR code every 30 seconds if not connected
+    {% if not connected %}
+    setInterval(function() {
+        if (!{{ connected|tojson }}) {
+            // Only refresh if still on the same page
+            if (window.location.pathname === '/whatsapp') {
+                window.location.reload();
+            }
+        }
+    }, 30000);
+    {% endif %}
+
+    // Test message form
+    {% if connected %}
+    document.getElementById('testMessageForm').addEventListener('submit', function(e) {
+        e.preventDefault();
+        
+        const phone = document.getElementById('testPhone').value;
+        const message = document.getElementById('testMessage').value;
+        
+        // Simulate sending message
+        alert(`Mensagem de teste enviada para ${phone}:\n\n${message}`);
+        
+        // Clear form
+        this.reset();
+    });
+    {% endif %}
+</script>
+{% endblock %}

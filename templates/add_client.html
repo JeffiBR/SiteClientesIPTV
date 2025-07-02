@@ -1,0 +1,127 @@
+{% extends "base.html" %}
+
+{% block title %}Adicionar Cliente - Bot Cliente Manager{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h1>
+                <i class="bi bi-person-plus"></i>
+                Adicionar Cliente
+            </h1>
+            <a href="{{ url_for('clients') }}" class="btn btn-secondary">
+                <i class="bi bi-arrow-left"></i>
+                Voltar
+            </a>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-lg-8 col-md-10 mx-auto">
+        <div class="card">
+            <div class="card-body">
+                <form method="POST">
+                    <!-- Basic Information -->
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label for="name" class="form-label">Nome do Cliente *</label>
+                            <input type="text" class="form-control" id="name" name="name" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="phone" class="form-label">Número do WhatsApp *</label>
+                            <input type="tel" class="form-control" id="phone" name="phone" 
+                                   placeholder="Ex: 5511999999999" required>
+                            <div class="form-text">Formato: código do país + DDD + número</div>
+                        </div>
+                    </div>
+
+                    <!-- Plan Information -->
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label for="plan_type" class="form-label">Tipo de Plano *</label>
+                            <select class="form-select" id="plan_type" name="plan_type" required>
+                                <option value="">Selecione o tipo</option>
+                                <option value="IPTV">IPTV</option>
+                                <option value="VPN">VPN</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="value" class="form-label">Valor do Plano (R$) *</label>
+                            <input type="number" class="form-control" id="value" name="value" 
+                                   step="0.01" min="0" required>
+                        </div>
+                    </div>
+
+                    <!-- Payment Information -->
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label for="plan_duration" class="form-label">Data de Vencimento do Plano *</label>
+                            <input type="date" class="form-control" id="plan_duration" name="plan_duration" required>
+                            <div class="form-text">Data em que o plano expira</div>
+                        </div>
+                    </div>
+
+                    <!-- Reminder Times -->
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label for="reminder_time_3days" class="form-label">Horário Lembrete 3 Dias</label>
+                            <input type="time" class="form-control" id="reminder_time_3days" 
+                                   name="reminder_time_3days" value="09:00">
+                            <div class="form-text">Horário para enviar lembrete 3 dias antes</div>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="reminder_time_payment" class="form-label">Horário Lembrete Pagamento</label>
+                            <input type="time" class="form-control" id="reminder_time_payment" 
+                                   name="reminder_time_payment" value="10:00">
+                            <div class="form-text">Horário para enviar lembrete no dia do vencimento</div>
+                        </div>
+                    </div>
+
+                    <!-- Custom Messages -->
+                    <div class="mb-3">
+                        <h5>Mensagens Personalizadas (Opcional)</h5>
+                        <div class="alert alert-info">
+                            <i class="bi bi-robot"></i>
+                            <strong>IA Integrada:</strong> Se deixar em branco, nossa IA gerará mensagens personalizadas e inteligentes automaticamente para cada cliente!
+                        </div>
+                        <div class="text-muted mb-3">
+                            Use {name}, {plan_type}, {value} como variáveis se quiser personalizar.
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="custom_message_3days" class="form-label">Mensagem Personalizada - 3 Dias Antes</label>
+                        <textarea class="form-control" id="custom_message_3days" name="custom_message_3days" 
+                                  rows="3" placeholder="Deixe em branco para usar IA ou digite sua mensagem personalizada..."></textarea>
+                    </div>
+
+                    <div class="mb-4">
+                        <label for="custom_message_payment" class="form-label">Mensagem Personalizada - Dia do Vencimento</label>
+                        <textarea class="form-control" id="custom_message_payment" name="custom_message_payment" 
+                                  rows="3" placeholder="Deixe em branco para usar IA ou digite sua mensagem personalizada..."></textarea>
+                    </div>
+
+                    <!-- Form Actions -->
+                    <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                        <a href="{{ url_for('clients') }}" class="btn btn-secondary me-md-2">Cancelar</a>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="bi bi-save"></i>
+                            Salvar Cliente
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Set default reminder times
+    document.getElementById('reminder_time_3days').value = '09:00';
+    document.getElementById('reminder_time_payment').value = '10:00';
+</script>
+{% endblock %}

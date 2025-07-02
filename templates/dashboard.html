@@ -1,0 +1,248 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard - Bot Cliente Manager{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <h1 class="mb-4">
+            <i class="bi bi-speedometer2"></i>
+            Dashboard
+        </h1>
+    </div>
+</div>
+
+<!-- Main Statistics Cards -->
+<div class="row mb-4">
+    <div class="col-lg-3 col-md-6 mb-3">
+        <div class="card bg-primary h-100">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h6 class="card-title">Total de Clientes</h6>
+                        <h3 class="card-text">{{ total_clients }}</h3>
+                        <small>
+                            <i class="bi bi-check-circle"></i> {{ active_clients }} ativos
+                        </small>
+                    </div>
+                    <div class="align-self-center">
+                        <i class="bi bi-people fs-1"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-lg-3 col-md-6 mb-3">
+        <div class="card bg-success h-100">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h6 class="card-title">Receita Ativa</h6>
+                        <h3 class="card-text">R$ {{ "%.2f"|format(active_revenue) }}</h3>
+                        <small>
+                            <i class="bi bi-graph-up"></i> Total: R$ {{ "%.2f"|format(total_value) }}
+                        </small>
+                    </div>
+                    <div class="align-self-center">
+                        <i class="bi bi-currency-dollar fs-1"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-lg-3 col-md-6 mb-3">
+        <div class="card bg-warning h-100">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h6 class="card-title">Vencendo</h6>
+                        <h3 class="card-text">{{ expiring_clients }}</h3>
+                        <small>
+                            <i class="bi bi-clock"></i> Próximos a vencer
+                        </small>
+                    </div>
+                    <div class="align-self-center">
+                        <i class="bi bi-exclamation-triangle fs-1"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-lg-3 col-md-6 mb-3">
+        <div class="card bg-danger h-100">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h6 class="card-title">Expirados</h6>
+                        <h3 class="card-text">{{ expired_clients }}</h3>
+                        <small>
+                            <i class="bi bi-x-circle"></i> Renovação necessária
+                        </small>
+                    </div>
+                    <div class="align-self-center">
+                        <i class="bi bi-ban fs-1"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Category Breakdown -->
+<div class="row mb-4">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h5><i class="bi bi-tv"></i> IPTV - Detalhes</h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-6">
+                        <h3 class="text-info">{{ active_iptv_count }}</h3>
+                        <p class="text-muted mb-1">Clientes Ativos</p>
+                        <small class="text-muted">Total: {{ iptv_count }} clientes</small>
+                    </div>
+                    <div class="col-6">
+                        <h3 class="text-info">R$ {{ "%.2f"|format(active_iptv_revenue) }}</h3>
+                        <p class="text-muted mb-1">Receita Ativa</p>
+                        <small class="text-muted">Total: R$ {{ "%.2f"|format(iptv_value) }}</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h5><i class="bi bi-shield-lock"></i> VPN - Detalhes</h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-6">
+                        <h3 class="text-secondary">{{ active_vpn_count }}</h3>
+                        <p class="text-muted mb-1">Clientes Ativos</p>
+                        <small class="text-muted">Total: {{ vpn_count }} clientes</small>
+                    </div>
+                    <div class="col-6">
+                        <h3 class="text-secondary">R$ {{ "%.2f"|format(active_vpn_revenue) }}</h3>
+                        <p class="text-muted mb-1">Receita Ativa</p>
+                        <small class="text-muted">Total: R$ {{ "%.2f"|format(vpn_value) }}</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Charts -->
+<div class="row mb-4">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h5><i class="bi bi-pie-chart"></i> Distribuição por Categoria</h5>
+            </div>
+            <div class="card-body">
+                <canvas id="categoryChart"></canvas>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h5><i class="bi bi-bar-chart"></i> Receita por Categoria</h5>
+            </div>
+            <div class="card-body">
+                <canvas id="revenueChart"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Upcoming Reminders -->
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5><i class="bi bi-bell"></i> Próximos Lembretes</h5>
+            </div>
+            <div class="card-body">
+                {% if upcoming_reminders %}
+                    <div class="table-responsive">
+                        <table class="table table-striped">
+                            <thead>
+                                <tr>
+                                    <th>Cliente</th>
+                                    <th>Tipo</th>
+                                    <th>Dia</th>
+                                    <th>Horário</th>
+                                    <th>Plano</th>
+                                    <th>Valor</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for reminder in upcoming_reminders %}
+                                <tr>
+                                    <td>
+                                        <strong>{{ reminder.client }}</strong>
+                                        <br>
+                                        <small class="text-muted">
+                                            <i class="bi bi-whatsapp"></i>
+                                            {{ reminder.phone }}
+                                        </small>
+                                    </td>
+                                    <td>
+                                        <span class="badge bg-{{ 'warning' if reminder.type == 'Lembrete 3 dias' else 'danger' }}">
+                                            {{ reminder.type }}
+                                        </span>
+                                    </td>
+                                    <td>{{ reminder.date }}</td>
+                                    <td>{{ reminder.time }}</td>
+                                    <td>
+                                        <span class="badge bg-{{ 'info' if reminder.plan_type == 'IPTV' else 'secondary' }}">
+                                            {{ reminder.plan_type }}
+                                        </span>
+                                    </td>
+                                    <td>
+                                        R$ {{ "%.2f"|format(reminder.value) }}
+                                        <br>
+                                        <small class="text-{{ 'success' if reminder.days_until > 3 else 'warning' if reminder.days_until > 0 else 'danger' }}">
+                                            {{ reminder.days_until }} dias
+                                        </small>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% else %}
+                    <div class="text-center text-muted">
+                        <i class="bi bi-bell-slash fs-1"></i>
+                        <p class="fs-5">Nenhum lembrete próximo</p>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/dashboard.js') }}"></script>
+<script>
+    // Initialize charts with data
+    initializeCharts({
+        iptv_count: {{ active_iptv_count }},
+        vpn_count: {{ active_vpn_count }},
+        iptv_value: {{ active_iptv_revenue }},
+        vpn_value: {{ active_vpn_revenue }},
+        active_clients: {{ active_clients }},
+        expiring_clients: {{ expiring_clients }},
+        expired_clients: {{ expired_clients }}
+    });
+</script>
+{% endblock %}
