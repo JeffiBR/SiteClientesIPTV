@@ -1,5 +1,9 @@
 // Clients page JavaScript functionality
 
+// Global variables
+let currentFilter = 'all';
+let searchTerm = '';
+
 // Delete confirmation modal
 function confirmDelete(clientId, clientName) {
     const modal = new bootstrap.Modal(document.getElementById('deleteModal'));
@@ -14,6 +18,181 @@ function confirmDelete(clientId, clientName) {
 
     // Show modal
     modal.show();
+}
+
+// Renewal modal functionality
+function showRenewalModal(clientId, clientName) {
+    const modal = new bootstrap.Modal(document.getElementById('renewalModal'));
+    const clientNameElement = document.getElementById('renewalClientName');
+    const renewalForm = document.getElementById('renewalForm');
+    const renewalDaysSelect = document.getElementById('renewal_days');
+    const customDaysInput = document.getElementById('customDaysInput');
+    const customDaysField = document.getElementById('custom_days');
+
+    // Set client name
+    clientNameElement.textContent = clientName;
+    
+    // Set form action
+    renewalForm.action = `/clients/renew/${clientId}`;
+
+    // Handle custom days option
+    renewalDaysSelect.addEventListener('change', function() {
+        if (this.value === 'custom') {
+            customDaysInput.style.display = 'block';
+            customDaysField.required = true;
+            // Update form submission to use custom value
+            renewalForm.addEventListener('submit', function(e) {
+                if (renewalDaysSelect.value === 'custom') {
+                    // Create a hidden input with the custom value
+                    const hiddenInput = document.createElement('input');
+                    hiddenInput.type = 'hidden';
+                    hiddenInput.name = 'renewal_days';
+                    hiddenInput.value = customDaysField.value;
+                    this.appendChild(hiddenInput);
+                    
+                    // Remove the select from form submission
+                    renewalDaysSelect.disabled = true;
+                }
+            });
+        } else {
+            customDaysInput.style.display = 'none';
+            customDaysField.required = false;
+            renewalDaysSelect.disabled = false;
+        }
+    });
+
+    // Show modal
+    modal.show();
+}
+
+// Payment status toggle
+function togglePaymentStatus(clientId, currentStatus) {
+    const form = document.getElementById('paymentStatusForm');
+    const statusInput = document.getElementById('paymentStatus');
+    
+    // Set new status (toggle)
+    const newStatus = currentStatus === 'paid' ? 'pending' : 'paid';
+    statusInput.value = newStatus;
+    
+    // Set form action
+    form.action = `/clients/payment-status/${clientId}`;
+    
+    // Submit form
+    form.submit();
+}
+
+// Mobile filter functionality
+function initializeMobileFilters() {
+    const tabs = document.querySelectorAll('.mobile-nav-tab');
+    const mobileSearch = document.getElementById('mobileClientSearch');
+    
+    // Tab click handlers
+    tabs.forEach(tab => {
+        tab.addEventListener('click', function() {
+            // Remove active class from all tabs
+            tabs.forEach(t => t.classList.remove('active'));
+            
+            // Add active class to clicked tab
+            this.classList.add('active');
+            
+            // Update current filter
+            currentFilter = this.dataset.filter;
+            
+            // Apply filters
+            applyMobileFilters();
+        });
+    });
+    
+    // Mobile search handler
+    if (mobileSearch) {
+        mobileSearch.addEventListener('input', function() {
+            searchTerm = this.value.toLowerCase();
+            applyMobileFilters();
+        });
+    }
+}
+
+// Apply mobile filters
+function applyMobileFilters() {
+    const cards = document.querySelectorAll('.client-card');
+    
+    cards.forEach(card => {
+        const status = card.dataset.status;
+        const name = card.dataset.name;
+        const phone = card.dataset.phone;
+        const plan = card.dataset.plan;
+        
+        // Check status filter
+        const statusMatch = currentFilter === 'all' || status === currentFilter;
+        
+        // Check search term
+        const searchMatch = searchTerm === '' || 
+            name.includes(searchTerm) || 
+            phone.includes(searchTerm) || 
+            plan.toLowerCase().includes(searchTerm);
+        
+        // Show/hide card
+        if (statusMatch && searchMatch) {
+            card.style.display = 'block';
+            card.classList.add('animate-slide-in');
+        } else {
+            card.style.display = 'none';
+            card.classList.remove('animate-slide-in');
+        }
+    });
+}
+
+// Desktop search and filter
+function initializeDesktopFilters() {
+    const searchInput = document.getElementById('clientSearch');
+    const statusFilter = document.getElementById('statusFilter');
+    const planFilter = document.getElementById('planFilter');
+    
+    if (searchInput) {
+        searchInput.addEventListener('input', function() {
+            applyDesktopFilters();
+        });
+    }
+    
+    if (statusFilter) {
+        statusFilter.addEventListener('change', function() {
+            applyDesktopFilters();
+        });
+    }
+    
+    if (planFilter) {
+        planFilter.addEventListener('change', function() {
+            applyDesktopFilters();
+        });
+    }
+}
+
+// Apply desktop filters
+function applyDesktopFilters() {
+    const searchInput = document.getElementById('clientSearch');
+    const statusFilter = document.getElementById('statusFilter');
+    const planFilter = document.getElementById('planFilter');
+    const rows = document.querySelectorAll('#clientsTable tbody tr');
+    
+    const searchTerm = searchInput ? searchInput.value.toLowerCase() : '';
+    const statusValue = statusFilter ? statusFilter.value : '';
+    const planValue = planFilter ? planFilter.value : '';
+    
+    rows.forEach(row => {
+        const text = row.textContent.toLowerCase();
+        const status = row.dataset.status;
+        const plan = row.dataset.plan;
+        
+        const searchMatch = text.includes(searchTerm);
+        const statusMatch = statusValue === '' || status === statusValue;
+        const planMatch = planValue === '' || plan === planValue;
+        
+        if (searchMatch && statusMatch && planMatch) {
+            row.style.display = '';
+        } else {
+            row.style.display = 'none';
+        }
+    });
 }
 
 // Form validation
@@ -64,20 +243,6 @@ function validateClientForm() {
             }
         }
 
-        // Validate payment day
-        const paymentDayField = form.querySelector('[name="payment_day"]');
-        if (paymentDayField && paymentDayField.value) {
-            const day = parseInt(paymentDayField.value);
-            if (day < 1 || day > 31) {
-                paymentDayField.classList.add('is-invalid');
-                showFieldError(paymentDayField, 'Dia deve estar entre 1 e 31');
-                isValid = false;
-            } else {
-                paymentDayField.classList.remove('is-invalid');
-                paymentDayField.classList.add('is-valid');
-            }
-        }
-
         if (!isValid) {
             event.preventDefault();
             event.stopPropagation();
@@ -103,8 +268,8 @@ function showFieldError(field, message) {
 
 // Format phone number input
 function formatPhoneInput() {
-    const phoneField = document.querySelector('[name="phone"]');
-    if (phoneField) {
+    const phoneFields = document.querySelectorAll('[name="phone"]');
+    phoneFields.forEach(phoneField => {
         phoneField.addEventListener('input', function(e) {
             // Remove all non-digits
             let value = e.target.value.replace(/\D/g, '');
@@ -122,51 +287,126 @@ function formatPhoneInput() {
                 showFieldError(e.target, 'Número muito curto');
             }
         });
-    }
+    });
 }
 
 // Format currency input
 function formatCurrencyInput() {
-    const valueField = document.querySelector('[name="value"]');
-    if (valueField) {
+    const valueFields = document.querySelectorAll('[name="value"]');
+    valueFields.forEach(valueField => {
         valueField.addEventListener('blur', function(e) {
             const value = parseFloat(e.target.value);
             if (!isNaN(value)) {
                 e.target.value = value.toFixed(2);
             }
         });
-    }
+    });
 }
 
-// Client search functionality
-function initializeClientSearch() {
-    const searchInput = document.createElement('input');
-    searchInput.type = 'text';
-    searchInput.className = 'form-control mb-3';
-    searchInput.placeholder = 'Buscar cliente...';
-    searchInput.id = 'clientSearch';
+// Animation on scroll for mobile cards
+function initializeScrollAnimations() {
+    const observerOptions = {
+        threshold: 0.1,
+        rootMargin: '0px 0px -50px 0px'
+    };
 
-    const table = document.getElementById('clientsTable');
-    if (table) {
-        table.parentElement.insertBefore(searchInput, table);
-
-        searchInput.addEventListener('input', function(e) {
-            const searchTerm = e.target.value.toLowerCase();
-            const rows = table.querySelectorAll('tbody tr');
-
-            rows.forEach(row => {
-                const text = row.textContent.toLowerCase();
-                if (text.includes(searchTerm)) {
-                    row.style.display = '';
-                } else {
-                    row.style.display = 'none';
-                }
-            });
+    const observer = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+            if (entry.isIntersecting) {
+                entry.target.classList.add('animate-fade-in');
+            }
         });
-    }
+    }, observerOptions);
+
+    // Observe mobile cards
+    const mobileCards = document.querySelectorAll('.mobile-client-card');
+    mobileCards.forEach(card => {
+        observer.observe(card);
+    });
 }
 
-// Sort table functionality
+// Haptic feedback simulation
+function initializeHapticFeedback() {
+    const hapticElements = document.querySelectorAll('.haptic-feedback');
+    
+    hapticElements.forEach(element => {
+        element.addEventListener('touchstart', function() {
+            // Visual feedback
+            this.style.transform = 'scale(0.98)';
+            
+            // Vibration API (if supported)
+            if ('vibrate' in navigator) {
+                navigator.vibrate(10);
+            }
+        });
+        
+        element.addEventListener('touchend', function() {
+            setTimeout(() => {
+                this.style.transform = '';
+            }, 100);
+        });
+    });
+}
+
+// Pull to refresh functionality (mobile)
+function initializePullToRefresh() {
+    let startY = 0;
+    let currentY = 0;
+    let pulling = false;
+    const pullThreshold = 100;
+    
+    const mobileContainer = document.querySelector('.mobile-client-cards');
+    if (!mobileContainer) return;
+    
+    // Add pull to refresh indicator
+    const pullIndicator = document.createElement('div');
+    pullIndicator.className = 'pull-to-refresh';
+    pullIndicator.innerHTML = '<i class="bi bi-arrow-down-circle"></i> Puxe para atualizar';
+    pullIndicator.style.display = 'none';
+    mobileContainer.insertBefore(pullIndicator, mobileContainer.firstChild);
+    
+    mobileContainer.addEventListener('touchstart', function(e) {
+        startY = e.touches[0].clientY;
+        pulling = window.scrollY === 0;
+    });
+    
+    mobileContainer.addEventListener('touchmove', function(e) {
+        if (!pulling) return;
+        
+        currentY = e.touches[0].clientY;
+        const pullDistance = Math.max(0, currentY - startY);
+        
+        if (pullDistance > 10) {
+            e.preventDefault();
+            pullIndicator.style.display = 'block';
+            pullIndicator.style.transform = `translateY(${Math.min(pullDistance, pullThreshold)}px)`;
+            
+            if (pullDistance >= pullThreshold) {
+                pullIndicator.innerHTML = '<i class="bi bi-arrow-clockwise"></i> Solte para atualizar';
+            }
+        }
+    });
+    
+    mobileContainer.addEventListener('touchend', function(e) {
+        if (!pulling) return;
+        
+        const pullDistance = currentY - startY;
+        
+        if (pullDistance >= pullThreshold) {
+            // Refresh page
+            window.location.reload();
+        } else {
+            // Reset indicator
+            pullIndicator.style.display = 'none';
+            pullIndicator.style.transform = '';
+            pullIndicator.innerHTML = '<i class="bi bi-arrow-down-circle"></i> Puxe para atualizar';
+        }
+        
+        pulling = false;
+    });
+}
+
+// Sort table functionality (desktop)
 function initializeTableSort() {
     const table = document.getElementById('clientsTable');
     if (!table) return;
@@ -199,7 +439,7 @@ function sortTable(table, columnIndex) {
         const bText = b.cells[columnIndex].textContent.trim();
 
         // Handle numeric columns
-        if (columnIndex === 2 || columnIndex === 3) { // Value or payment day
+        if (columnIndex === 3) { // Value column
             const aNum = parseFloat(aText.replace(/[^\d.-]/g, ''));
             const bNum = parseFloat(bText.replace(/[^\d.-]/g, ''));
             return isAscending ? aNum - bNum : bNum - aNum;
@@ -221,44 +461,46 @@ function sortTable(table, columnIndex) {
     });
 
     const currentHeader = table.querySelectorAll('thead th')[columnIndex].querySelector('i');
-    currentHeader.className = isAscending ? 
-        'bi bi-arrow-up ms-1' : 
-        'bi bi-arrow-down ms-1';
+    if (currentHeader) {
+        currentHeader.className = isAscending ? 
+            'bi bi-arrow-up ms-1' : 
+            'bi bi-arrow-down ms-1';
+    }
 }
-
-// Initialize page functionality
-document.addEventListener('DOMContentLoaded', function() {
-    validateClientForm();
-    formatPhoneInput();
-    formatCurrencyInput();
-    initializeClientSearch();
-    initializeTableSort();
-
-    // Add smooth animations
-    const rows = document.querySelectorAll('tbody tr');
-    rows.forEach((row, index) => {
-        row.style.opacity = '0';
-        row.style.transform = 'translateX(-20px)';
-        
-        setTimeout(() => {
-            row.style.transition = 'all 0.3s ease';
-            row.style.opacity = '1';
-            row.style.transform = 'translateX(0)';
-        }, index * 50);
-    });
-});
 
 // Export clients data
 function exportClients() {
     const table = document.getElementById('clientsTable');
-    if (!table) return;
+    if (!table) {
+        // For mobile, create data from cards
+        const cards = document.querySelectorAll('.mobile-client-card:not([style*="display: none"])');
+        const data = [];
+        
+        cards.forEach(card => {
+            const name = card.querySelector('.mobile-client-name').textContent;
+            const plan = card.querySelector('.mobile-client-plan').textContent;
+            const phone = card.dataset.phone;
+            const status = card.dataset.status;
+            
+            data.push({
+                'Cliente': name,
+                'Plano': plan,
+                'Telefone': phone,
+                'Status': status
+            });
+        });
+        
+        downloadCSV(data, 'clientes-mobile');
+        return;
+    }
 
+    // Desktop export
     const data = [];
     const headers = Array.from(table.querySelectorAll('thead th'))
         .slice(0, -1) // Remove actions column
         .map(th => th.textContent.trim());
 
-    const rows = table.querySelectorAll('tbody tr');
+    const rows = table.querySelectorAll('tbody tr:not([style*="display: none"])');
     rows.forEach(row => {
         const rowData = {};
         const cells = row.querySelectorAll('td');
@@ -272,50 +514,102 @@ function exportClients() {
         data.push(rowData);
     });
 
-    // Create CSV content
+    downloadCSV(data, 'clientes-desktop');
+}
+
+function downloadCSV(data, filename) {
+    if (data.length === 0) return;
+    
+    const headers = Object.keys(data[0]);
     const csvContent = [
         headers.join(','),
         ...data.map(row => headers.map(header => `"${row[header] || ''}"`).join(','))
     ].join('\n');
 
-    // Download CSV
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
     link.href = URL.createObjectURL(blob);
-    link.download = `clientes-${new Date().toISOString().split('T')[0]}.csv`;
+    link.download = `${filename}-${new Date().toISOString().split('T')[0]}.csv`;
     link.click();
 }
 
-// Bulk actions (future feature)
-function initializeBulkActions() {
-    const table = document.getElementById('clientsTable');
-    if (!table) return;
-
-    // Add checkboxes to each row
-    const rows = table.querySelectorAll('tbody tr');
-    rows.forEach(row => {
-        const checkbox = document.createElement('input');
-        checkbox.type = 'checkbox';
-        checkbox.className = 'form-check-input';
-        
-        const cell = document.createElement('td');
-        cell.appendChild(checkbox);
-        row.insertBefore(cell, row.firstChild);
-    });
-
-    // Add header checkbox
-    const headerRow = table.querySelector('thead tr');
-    const headerCheckbox = document.createElement('input');
-    headerCheckbox.type = 'checkbox';
-    headerCheckbox.className = 'form-check-input';
+// Initialize page functionality
+document.addEventListener('DOMContentLoaded', function() {
+    // Initialize form validation
+    validateClientForm();
+    formatPhoneInput();
+    formatCurrencyInput();
     
-    const headerCell = document.createElement('th');
-    headerCell.appendChild(headerCheckbox);
-    headerRow.insertBefore(headerCell, headerRow.firstChild);
-
-    // Select all functionality
-    headerCheckbox.addEventListener('change', function() {
-        const checkboxes = table.querySelectorAll('tbody input[type="checkbox"]');
-        checkboxes.forEach(cb => cb.checked = this.checked);
+    // Initialize filters
+    initializeMobileFilters();
+    initializeDesktopFilters();
+    
+    // Initialize animations and interactions
+    initializeScrollAnimations();
+    initializeHapticFeedback();
+    initializePullToRefresh();
+    initializeTableSort();
+    
+    // Add smooth animations for mobile cards
+    const mobileCards = document.querySelectorAll('.mobile-client-card');
+    mobileCards.forEach((card, index) => {
+        card.style.opacity = '0';
+        card.style.transform = 'translateY(20px)';
+        
+        setTimeout(() => {
+            card.style.transition = 'all 0.3s ease';
+            card.style.opacity = '1';
+            card.style.transform = 'translateY(0)';
+        }, index * 100);
     });
+    
+    // Add smooth animations for desktop rows
+    const desktopRows = document.querySelectorAll('#clientsTable tbody tr');
+    desktopRows.forEach((row, index) => {
+        row.style.opacity = '0';
+        row.style.transform = 'translateX(-20px)';
+        
+        setTimeout(() => {
+            row.style.transition = 'all 0.3s ease';
+            row.style.opacity = '1';
+            row.style.transform = 'translateX(0)';
+        }, index * 50);
+    });
+    
+    // Initialize tooltips
+    const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+    tooltipTriggerList.map(function (tooltipTriggerEl) {
+        return new bootstrap.Tooltip(tooltipTriggerEl);
+    });
+});
+
+// Service Worker for offline functionality (future enhancement)
+if ('serviceWorker' in navigator) {
+    window.addEventListener('load', function() {
+        navigator.serviceWorker.register('/sw.js')
+            .then(function(registration) {
+                console.log('ServiceWorker registration successful');
+            })
+            .catch(function(err) {
+                console.log('ServiceWorker registration failed: ', err);
+            });
+    });
+}
+
+// Performance optimization: Lazy loading for images (if any)
+function initializeLazyLoading() {
+    const images = document.querySelectorAll('img[data-src]');
+    
+    const imageObserver = new IntersectionObserver((entries, observer) => {
+        entries.forEach(entry => {
+            if (entry.isIntersecting) {
+                const img = entry.target;
+                img.src = img.dataset.src;
+                img.classList.remove('lazy');
+                imageObserver.unobserve(img);
+            }
+        });
+    });
+    
+    images.forEach(img => imageObserver.observe(img));
 }

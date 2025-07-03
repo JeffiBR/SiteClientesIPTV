@@ -3,14 +3,39 @@
 {% block title %}Clientes - Bot Cliente Manager{% endblock %}
 
 {% block content %}
-<div class="row">
-    <div class="col-12">
-        <div class="d-flex justify-content-between align-items-center mb-4">
-            <h1>
+<!-- Desktop Header -->
+<div class="d-none d-md-block">
+    <div class="row">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h1>
+                    <i class="bi bi-people-fill"></i>
+                    Gestão de Clientes
+                </h1>
+                <div class="d-flex gap-2">
+                    <button class="btn btn-outline-secondary" onclick="exportClients()">
+                        <i class="bi bi-download"></i>
+                        Exportar
+                    </button>
+                    <a href="{{ url_for('add_client') }}" class="btn btn-primary">
+                        <i class="bi bi-person-plus"></i>
+                        Novo Cliente
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Mobile Header -->
+<div class="d-md-none mobile-header">
+    <div class="row">
+        <div class="col-12">
+            <h1 class="text-center">
                 <i class="bi bi-people-fill"></i>
-                Gestão de Clientes
+                Clientes
             </h1>
-            <div class="d-flex gap-2">
+            <div class="mobile-actions">
                 <button class="btn btn-outline-secondary" onclick="exportClients()">
                     <i class="bi bi-download"></i>
                     Exportar
@@ -24,8 +49,8 @@
     </div>
 </div>
 
-<!-- Filter and Search Bar -->
-<div class="row mb-4">
+<!-- Desktop Filter and Search Bar -->
+<div class="row mb-4 d-none d-md-flex">
     <div class="col-12">
         <div class="card border-0 shadow-sm">
             <div class="card-body">
@@ -54,9 +79,22 @@
     </div>
 </div>
 
+<!-- Mobile Filters -->
+<div class="d-md-none mobile-filters">
+    <div class="container-fluid">
+        <input type="text" class="form-control" id="mobileClientSearch" placeholder="🔍 Buscar cliente...">
+        <div class="mobile-nav-tabs">
+            <button class="mobile-nav-tab active" data-filter="all">Todos</button>
+            <button class="mobile-nav-tab" data-filter="ativo">Ativos</button>
+            <button class="mobile-nav-tab" data-filter="vencendo">Vencendo</button>
+            <button class="mobile-nav-tab" data-filter="expirado">Expirados</button>
+        </div>
+    </div>
+</div>
+
 {% if clients %}
-<!-- Statistics Cards -->
-<div class="row mb-4">
+<!-- Desktop Statistics Cards -->
+<div class="row mb-4 d-none d-md-flex">
     <div class="col-md-3">
         <div class="card border-0 shadow-sm">
             <div class="card-body text-center">
@@ -103,163 +141,319 @@
     </div>
 </div>
 
-<!-- Clients Table -->
-<div class="row">
-    <div class="col-12">
-        <div class="card border-0 shadow-sm">
-            <div class="card-header bg-white border-bottom-0">
-                <h5 class="mb-0">
-                    <i class="bi bi-list-ul"></i>
-                    Lista de Clientes
-                </h5>
+<!-- Mobile Statistics -->
+<div class="d-md-none mobile-stats">
+    <div class="container-fluid">
+        <div class="row">
+            <div class="col-6 mb-3">
+                <div class="card border-0 shadow-sm">
+                    <div class="card-body text-center">
+                        <div class="stats-icon text-primary">
+                            <i class="bi bi-people"></i>
+                        </div>
+                        <div class="stats-number">{{ clients|length }}</div>
+                        <div class="stats-label">Total</div>
+                    </div>
+                </div>
             </div>
-            <div class="card-body p-0">
-                <div class="table-responsive">
-                    <table class="table table-hover mb-0" id="clientsTable">
-                        <thead class="table-light">
-                            <tr>
-                                <th class="border-0">Cliente</th>
-                                <th class="border-0 d-none d-md-table-cell">Contato</th>
-                                <th class="border-0">Plano</th>
-                                <th class="border-0 d-none d-lg-table-cell">Valor</th>
-                                <th class="border-0 d-none d-md-table-cell">Vencimento</th>
-                                <th class="border-0">Status</th>
-                                <th class="border-0 d-none d-lg-table-cell">Pagamento</th>
-                                <th class="border-0">Ações</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {% for client in clients %}
-                            <tr class="client-row" data-status="{{ client.status }}" data-plan="{{ client.plan_type }}">
-                                <td class="py-3">
-                                    <div class="d-flex align-items-center">
-                                        <div class="avatar-circle me-3">
-                                            {{ client.name[:2].upper() }}
-                                        </div>
-                                        <div>
-                                            <h6 class="mb-0">{{ client.name }}</h6>
-                                            <small class="text-muted d-md-none">
-                                                <i class="bi bi-whatsapp text-success"></i> {{ client.phone }}
-                                            </small>
-                                            <small class="text-muted d-lg-none">R$ {{ "%.2f"|format(client.value) }}</small>
-                                        </div>
-                                    </div>
-                                </td>
-                                <td class="py-3 d-none d-md-table-cell">
-                                    <div>
-                                        <i class="bi bi-whatsapp text-success me-1"></i>
-                                        <span class="text-muted">{{ client.phone }}</span>
-                                    </div>
-                                </td>
-                                <td class="py-3">
-                                    <span class="badge bg-{{ 'primary' if client.plan_type == 'IPTV' else 'info' }} fs-6">
-                                        {{ client.plan_type }}
-                                    </span>
-                                    <div class="d-md-none">
-                                        <small class="text-muted">{{ client.plan_duration }}</small>
-                                    </div>
-                                </td>
-                                <td class="py-3 d-none d-lg-table-cell">
-                                    <strong class="text-success">R$ {{ "%.2f"|format(client.value) }}</strong>
-                                </td>
-                                <td class="py-3 d-none d-md-table-cell">
-                                    <span class="text-muted">{{ client.plan_duration }}</span>
-                                </td>
-                                <td class="py-3">
-                                    {% if client.status == 'ativo' %}
-                                        <span class="badge bg-success-soft text-success">
-                                            <i class="bi bi-check-circle me-1"></i>Ativo
-                                        </span>
-                                    {% elif client.status == 'vencendo' %}
-                                        <span class="badge bg-warning-soft text-warning">
-                                            <i class="bi bi-exclamation-triangle me-1"></i>Vencendo
-                                        </span>
-                                    {% else %}
-                                        <span class="badge bg-danger-soft text-danger">
-                                            <i class="bi bi-x-circle me-1"></i>Expirado
-                                        </span>
-                                    {% endif %}
-                                    <div class="d-lg-none">
-                                        <small class="text-{{ 'success' if client.days_until_expiration > 3 else 'warning' if client.days_until_expiration > 0 else 'danger' }}">
-                                            {{ client.days_until_expiration }} d
-                                        </small>
-                                    </div>
-                                </td>
-                                <td class="py-3 d-none d-lg-table-cell">
-                                    {% if hasattr(client, 'payment_status') and client.payment_status == 'paid' %}
-                                        <span class="badge bg-success-soft text-success">
-                                            <i class="bi bi-check2 me-1"></i>Pago
-                                        </span>
-                                    {% else %}
-                                        <span class="badge bg-warning-soft text-warning">
-                                            <i class="bi bi-clock me-1"></i>Pendente
-                                        </span>
-                                    {% endif %}
-                                </td>
-                                <td class="py-3">
-                                    <div class="dropdown">
-                                        <button class="btn btn-outline-secondary btn-sm dropdown-toggle" type="button" data-bs-toggle="dropdown">
-                                            <i class="bi bi-three-dots"></i>
-                                        </button>
-                                        <ul class="dropdown-menu dropdown-menu-end">
-                                            <li>
-                                                <a class="dropdown-item" href="{{ url_for('edit_client', client_id=client.id) }}">
-                                                    <i class="bi bi-pencil me-2"></i>Editar
-                                                </a>
-                                            </li>
-                                            <li>
-                                                <button class="dropdown-item" onclick="showRenewalModal('{{ client.id }}', '{{ client.name }}')">
-                                                    <i class="bi bi-arrow-clockwise me-2"></i>Renovar
-                                                </button>
-                                            </li>
-                                            <li>
-                                                {% set current_status = client.payment_status if hasattr(client, 'payment_status') else 'pending' %}
-                                                <button class="dropdown-item" onclick="togglePaymentStatus('{{ client.id }}', '{{ current_status }}')">
-                                                    <i class="bi bi-credit-card me-2"></i>
-                                                    {% if current_status == 'paid' %}
-                                                        Marcar como Pendente
-                                                    {% else %}
-                                                        Marcar como Pago
-                                                    {% endif %}
-                                                </button>
-                                            </li>
-                                            <li><hr class="dropdown-divider"></li>
-                                            <li>
-                                                <button class="dropdown-item text-danger" onclick="confirmDelete('{{ client.id }}', '{{ client.name }}')">
-                                                    <i class="bi bi-trash me-2"></i>Excluir
-                                                </button>
-                                            </li>
-                                        </ul>
-                                    </div>
-                                </td>
-                            </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
+            <div class="col-6 mb-3">
+                <div class="card border-0 shadow-sm">
+                    <div class="card-body text-center">
+                        <div class="stats-icon text-success">
+                            <i class="bi bi-check-circle"></i>
+                        </div>
+                        <div class="stats-number">{{ clients|selectattr("status", "equalto", "ativo")|list|length }}</div>
+                        <div class="stats-label">Ativos</div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-6">
+                <div class="card border-0 shadow-sm">
+                    <div class="card-body text-center">
+                        <div class="stats-icon text-warning">
+                            <i class="bi bi-exclamation-triangle"></i>
+                        </div>
+                        <div class="stats-number">{{ clients|selectattr("status", "equalto", "vencendo")|list|length }}</div>
+                        <div class="stats-label">Vencendo</div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-6">
+                <div class="card border-0 shadow-sm">
+                    <div class="card-body text-center">
+                        <div class="stats-icon text-danger">
+                            <i class="bi bi-x-circle"></i>
+                        </div>
+                        <div class="stats-number">{{ clients|selectattr("status", "equalto", "expirado")|list|length }}</div>
+                        <div class="stats-label">Expirados</div>
+                    </div>
                 </div>
             </div>
         </div>
     </div>
 </div>
-{% else %}
-<div class="row">
-    <div class="col-12">
-        <div class="card border-0 shadow-sm">
-            <div class="card-body text-center py-5">
-                <div class="text-muted mb-4">
-                    <i class="bi bi-people fs-1"></i>
+
+<!-- Desktop Table -->
+<div class="d-none d-md-block desktop-table">
+    <div class="row">
+        <div class="col-12">
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-white border-bottom-0">
+                    <h5 class="mb-0">
+                        <i class="bi bi-list-ul"></i>
+                        Lista de Clientes
+                    </h5>
                 </div>
-                <h3 class="text-muted mb-3">Nenhum cliente cadastrado</h3>
-                <p class="text-muted mb-4">Comece adicionando seu primeiro cliente para gerenciar planos e pagamentos</p>
-                <a href="{{ url_for('add_client') }}" class="btn btn-primary btn-lg">
-                    <i class="bi bi-person-plus me-2"></i>
-                    Adicionar Primeiro Cliente
-                </a>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover mb-0" id="clientsTable">
+                            <thead class="table-light">
+                                <tr>
+                                    <th class="border-0">Cliente</th>
+                                    <th class="border-0">Contato</th>
+                                    <th class="border-0">Plano</th>
+                                    <th class="border-0">Valor</th>
+                                    <th class="border-0">Vencimento</th>
+                                    <th class="border-0">Status</th>
+                                    <th class="border-0">Pagamento</th>
+                                    <th class="border-0">Ações</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for client in clients %}
+                                <tr class="client-row" data-status="{{ client.status }}" data-plan="{{ client.plan_type }}">
+                                    <td class="py-3">
+                                        <div class="d-flex align-items-center">
+                                            <div class="avatar-circle me-3">
+                                                {{ client.name[:2].upper() }}
+                                            </div>
+                                            <div>
+                                                <h6 class="mb-0">{{ client.name }}</h6>
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td class="py-3">
+                                        <div>
+                                            <i class="bi bi-whatsapp text-success me-1"></i>
+                                            <span class="text-muted">{{ client.phone }}</span>
+                                        </div>
+                                    </td>
+                                    <td class="py-3">
+                                        <span class="badge bg-{{ 'primary' if client.plan_type == 'IPTV' else 'info' }} fs-6">
+                                            {{ client.plan_type }}
+                                        </span>
+                                    </td>
+                                    <td class="py-3">
+                                        <strong class="text-success">R$ {{ "%.2f"|format(client.value) }}</strong>
+                                    </td>
+                                    <td class="py-3">
+                                        <span class="text-muted">{{ client.plan_duration }}</span>
+                                    </td>
+                                    <td class="py-3">
+                                        {% if client.status == 'ativo' %}
+                                            <span class="badge bg-success-soft text-success">
+                                                <i class="bi bi-check-circle me-1"></i>Ativo
+                                            </span>
+                                        {% elif client.status == 'vencendo' %}
+                                            <span class="badge bg-warning-soft text-warning">
+                                                <i class="bi bi-exclamation-triangle me-1"></i>Vencendo
+                                            </span>
+                                        {% else %}
+                                            <span class="badge bg-danger-soft text-danger">
+                                                <i class="bi bi-x-circle me-1"></i>Expirado
+                                            </span>
+                                        {% endif %}
+                                    </td>
+                                    <td class="py-3">
+                                        {% set current_status = client.payment_status if hasattr(client, 'payment_status') else 'pending' %}
+                                        {% if current_status == 'paid' %}
+                                            <span class="badge bg-success-soft text-success">
+                                                <i class="bi bi-check2 me-1"></i>Pago
+                                            </span>
+                                        {% else %}
+                                            <span class="badge bg-warning-soft text-warning">
+                                                <i class="bi bi-clock me-1"></i>Pendente
+                                            </span>
+                                        {% endif %}
+                                    </td>
+                                    <td class="py-3">
+                                        <div class="dropdown">
+                                            <button class="btn btn-outline-secondary btn-sm dropdown-toggle" type="button" data-bs-toggle="dropdown">
+                                                <i class="bi bi-three-dots"></i>
+                                            </button>
+                                            <ul class="dropdown-menu dropdown-menu-end">
+                                                <li>
+                                                    <a class="dropdown-item" href="{{ url_for('edit_client', client_id=client.id) }}">
+                                                        <i class="bi bi-pencil me-2"></i>Editar
+                                                    </a>
+                                                </li>
+                                                <li>
+                                                    <button class="dropdown-item" onclick="showRenewalModal('{{ client.id }}', '{{ client.name }}')">
+                                                        <i class="bi bi-arrow-clockwise me-2"></i>Renovar
+                                                    </button>
+                                                </li>
+                                                <li>
+                                                    <button class="dropdown-item" onclick="togglePaymentStatus('{{ client.id }}', '{{ current_status }}')">
+                                                        <i class="bi bi-credit-card me-2"></i>
+                                                        {% if current_status == 'paid' %}
+                                                            Marcar como Pendente
+                                                        {% else %}
+                                                            Marcar como Pago
+                                                        {% endif %}
+                                                    </button>
+                                                </li>
+                                                <li><hr class="dropdown-divider"></li>
+                                                <li>
+                                                    <button class="dropdown-item text-danger" onclick="confirmDelete('{{ client.id }}', '{{ client.name }}')">
+                                                        <i class="bi bi-trash me-2"></i>Excluir
+                                                    </button>
+                                                </li>
+                                            </ul>
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
+</div>
+
+<!-- Mobile Client Cards -->
+<div class="d-md-none mobile-client-cards">
+    <div class="container-fluid">
+        {% for client in clients %}
+        {% set current_status = client.payment_status if hasattr(client, 'payment_status') else 'pending' %}
+        <div class="mobile-client-card animate-slide-in client-card" data-status="{{ client.status }}" data-plan="{{ client.plan_type }}" data-name="{{ client.name.lower() }}" data-phone="{{ client.phone }}">
+            <div class="mobile-client-header {{ client.plan_type.lower() }}">
+                <div class="mobile-client-name">{{ client.name }}</div>
+                <div class="mobile-client-plan">{{ client.plan_type }}</div>
+                <div class="mobile-status-badge">
+                    {% if client.status == 'ativo' %}
+                        <i class="bi bi-check-circle me-1"></i>Ativo
+                    {% elif client.status == 'vencendo' %}
+                        <i class="bi bi-exclamation-triangle me-1"></i>Vencendo
+                    {% else %}
+                        <i class="bi bi-x-circle me-1"></i>Expirado
+                    {% endif %}
+                </div>
+            </div>
+            <div class="mobile-client-body">
+                <div class="mobile-info-row">
+                    <div class="mobile-info-label">
+                        <i class="bi bi-whatsapp text-success"></i>
+                        Contato
+                    </div>
+                    <div class="mobile-info-value">{{ client.phone }}</div>
+                </div>
+                <div class="mobile-info-row">
+                    <div class="mobile-info-label">
+                        <i class="bi bi-currency-dollar"></i>
+                        Valor
+                    </div>
+                    <div class="mobile-info-value success">R$ {{ "%.2f"|format(client.value) }}</div>
+                </div>
+                <div class="mobile-info-row">
+                    <div class="mobile-info-label">
+                        <i class="bi bi-calendar-event"></i>
+                        Vencimento
+                    </div>
+                    <div class="mobile-info-value">{{ client.plan_duration }}</div>
+                </div>
+                <div class="mobile-info-row">
+                    <div class="mobile-info-label">
+                        <i class="bi bi-clock"></i>
+                        Dias restantes
+                    </div>
+                    <div class="mobile-info-value {{ 'success' if client.days_until_expiration > 3 else 'warning' if client.days_until_expiration >= 0 else 'danger' }}">
+                        {% if client.days_until_expiration >= 0 %}
+                            {{ client.days_until_expiration }} dias
+                        {% else %}
+                            {{ client.days_until_expiration|abs }} dias em atraso
+                        {% endif %}
+                    </div>
+                </div>
+                <div class="mobile-info-row">
+                    <div class="mobile-info-label">
+                        <i class="bi bi-credit-card"></i>
+                        Pagamento
+                    </div>
+                    <div class="mobile-info-value">
+                        {% if current_status == 'paid' %}
+                            <span class="mobile-payment-status paid">
+                                <i class="bi bi-check2"></i>Pago
+                            </span>
+                        {% else %}
+                            <span class="mobile-payment-status pending">
+                                <i class="bi bi-clock"></i>Pendente
+                            </span>
+                        {% endif %}
+                    </div>
+                </div>
+                
+                <div class="mobile-actions-container">
+                    <button class="mobile-action-btn haptic-feedback" onclick="showRenewalModal('{{ client.id }}', '{{ client.name }}')">
+                        <i class="bi bi-arrow-clockwise"></i>
+                        Renovar
+                    </button>
+                    <button class="mobile-action-btn haptic-feedback" onclick="togglePaymentStatus('{{ client.id }}', '{{ current_status }}')">
+                        <i class="bi bi-credit-card"></i>
+                        {% if current_status == 'paid' %}Pendente{% else %}Pago{% endif %}
+                    </button>
+                    <a href="{{ url_for('edit_client', client_id=client.id) }}" class="mobile-action-btn haptic-feedback">
+                        <i class="bi bi-pencil"></i>
+                        Editar
+                    </a>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+
+{% else %}
+<!-- Desktop Empty State -->
+<div class="d-none d-md-block">
+    <div class="row">
+        <div class="col-12">
+            <div class="card border-0 shadow-sm">
+                <div class="card-body text-center py-5">
+                    <div class="text-muted mb-4">
+                        <i class="bi bi-people fs-1"></i>
+                    </div>
+                    <h3 class="text-muted mb-3">Nenhum cliente cadastrado</h3>
+                    <p class="text-muted mb-4">Comece adicionando seu primeiro cliente para gerenciar planos e pagamentos</p>
+                    <a href="{{ url_for('add_client') }}" class="btn btn-primary btn-lg">
+                        <i class="bi bi-person-plus me-2"></i>
+                        Adicionar Primeiro Cliente
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Mobile Empty State -->
+<div class="d-md-none mobile-empty-state">
+    <div class="empty-icon">
+        <i class="bi bi-people"></i>
+    </div>
+    <h3>Nenhum cliente cadastrado</h3>
+    <p>Comece adicionando seu primeiro cliente para gerenciar planos e pagamentos de forma simples e eficiente.</p>
+    <a href="{{ url_for('add_client') }}" class="btn btn-primary btn-lg">
+        <i class="bi bi-person-plus me-2"></i>
+        Adicionar Cliente
+    </a>
 </div>
 {% endif %}
+
+<!-- Floating Action Button (Mobile) -->
+<a href="{{ url_for('add_client') }}" class="fab d-md-none">
+    <i class="bi bi-plus"></i>
+</a>
 
 <!-- Renewal Modal -->
 <div class="modal fade" id="renewalModal" tabindex="-1">
