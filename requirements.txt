@@ -12,6 +12,8 @@ blinker>=1.6.0
 
 # Dependências para melhorias (opcionais mas recomendadas)
 psutil>=5.9.0
+qrcode>=7.4.0
+Pillow>=10.0.0
 
 # Melhorias implementadas - dependências opcionais
 # Se não tiver psutil, funciona sem monitoramento de sistema
