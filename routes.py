@@ -369,7 +369,8 @@ def add_message_template():
             id=str(uuid.uuid4()),
             name=request.form['name'],
             content=request.form['content'],
-            type=request.form['type']
+            type=request.form['type'],
+            plan_type=request.form.get('plan_type', 'all')
         )
         
         templates = storage.get_message_templates()
@@ -1069,3 +1070,44 @@ def get_uptime():
         }
     except Exception:
         return {'error': 'Unable to get uptime'}
+
+# Template helper functions
+@app.template_global()
+def get_plan_color(plan_type):
+    """Get color class for plan type"""
+    colors = {
+        'IPTV': 'info',
+        'VPN': 'secondary',
+        'all': 'primary'
+    }
+    return colors.get(plan_type, 'primary')
+
+@app.template_global()
+def get_plan_icon(plan_type):
+    """Get icon for plan type"""
+    icons = {
+        'IPTV': 'tv',
+        'VPN': 'shield-lock',
+        'all': 'gear'
+    }
+    return icons.get(plan_type, 'gear')
+
+@app.template_global()
+def get_type_color(message_type):
+    """Get color class for message type"""
+    colors = {
+        '3days': 'warning',
+        'payment': 'danger',
+        'promo': 'success'
+    }
+    return colors.get(message_type, 'secondary')
+
+@app.template_global()
+def get_type_label(message_type):
+    """Get label for message type"""
+    labels = {
+        '3days': 'Lembrete 3 Dias',
+        'payment': 'Dia do Pagamento',
+        'promo': 'Promocional'
+    }
+    return labels.get(message_type, message_type)

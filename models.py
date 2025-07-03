@@ -112,36 +112,97 @@ class Client:
         return cls(**data)
 
 class MessageTemplate:
-    def __init__(self, id: str, name: str, content: str, type: str):
+    def __init__(self, id: str, name: str, content: str, type: str, plan_type: str = "all"):
         self.id = id
         self.name = name
         self.content = content  # Message content with placeholders
         self.type = type  # '3days' or 'payment'
+        self.plan_type = plan_type  # 'IPTV', 'VPN', or 'all'
     
     def to_dict(self) -> Dict:
         return {
             'id': self.id,
             'name': self.name,
             'content': self.content,
-            'type': self.type
+            'type': self.type,
+            'plan_type': self.plan_type
         }
     
     @classmethod
     def from_dict(cls, data: Dict) -> 'MessageTemplate':
-        return cls(**data)
+        # Para compatibilidade com templates antigos
+        plan_type = data.get('plan_type', 'all')
+        return cls(
+            id=data['id'],
+            name=data['name'],
+            content=data['content'],
+            type=data['type'],
+            plan_type=plan_type
+        )
 
 # Default message templates
 DEFAULT_TEMPLATES = [
+    # Templates gerais (compatibilidade)
     {
         'id': 'default_3days',
-        'name': 'Lembrete 3 Dias Antes',
+        'name': 'Lembrete 3 Dias - Geral',
         'content': 'Olá {name}! Seu plano {plan_type} no valor de R$ {value} vence em 3 dias (dia {payment_day}). Não esqueça de renovar!',
-        'type': '3days'
+        'type': '3days',
+        'plan_type': 'all'
     },
     {
         'id': 'default_payment',
-        'name': 'Lembrete Dia do Pagamento',
+        'name': 'Lembrete Pagamento - Geral',
         'content': 'Olá {name}! Hoje é o dia do vencimento do seu plano {plan_type} no valor de R$ {value}. Por favor, realize o pagamento para manter o serviço ativo.',
-        'type': 'payment'
+        'type': 'payment',
+        'plan_type': 'all'
+    },
+    
+    # Templates específicos para IPTV
+    {
+        'id': 'iptv_3days',
+        'name': 'IPTV - Lembrete 3 Dias',
+        'content': '📺 Olá {name}! Seu plano IPTV Premium de R$ {value} vence em 3 dias (dia {payment_day}). Mantenha seus canais favoritos sempre disponíveis! Renove já e continue aproveitando todos os canais em HD.',
+        'type': '3days',
+        'plan_type': 'IPTV'
+    },
+    {
+        'id': 'iptv_payment',
+        'name': 'IPTV - Dia do Pagamento',
+        'content': '📺 {name}, hoje é o dia! Seu plano IPTV de R$ {value} vence hoje. Para não perder nenhum programa, renove agora e garante mais 30 dias de entretenimento sem interrupção!',
+        'type': 'payment',
+        'plan_type': 'IPTV'
+    },
+    
+    # Templates específicos para VPN
+    {
+        'id': 'vpn_3days',
+        'name': 'VPN - Lembrete 3 Dias',
+        'content': '🔒 Olá {name}! Sua proteção VPN Premium de R$ {value} vence em 3 dias (dia {payment_day}). Mantenha sua privacidade e segurança online protegidas. Renove já!',
+        'type': '3days',
+        'plan_type': 'VPN'
+    },
+    {
+        'id': 'vpn_payment',
+        'name': 'VPN - Dia do Pagamento',
+        'content': '🔒 {name}, sua segurança é prioridade! Seu plano VPN de R$ {value} vence hoje. Renove agora e continue navegando com total privacidade e proteção contra ameaças online.',
+        'type': 'payment',
+        'plan_type': 'VPN'
+    },
+    
+    # Templates promocionais específicos
+    {
+        'id': 'iptv_promo',
+        'name': 'IPTV - Oferta Especial',
+        'content': '🎉 {name}, oferta especial IPTV! Renovando hoje ganhe 5 dias extras GRÁTIS. Seu plano de R$ {value} pode ser renovado com desconto. Aproveite!',
+        'type': 'promo',
+        'plan_type': 'IPTV'
+    },
+    {
+        'id': 'vpn_promo',
+        'name': 'VPN - Upgrade Premium',
+        'content': '⚡ {name}, que tal um upgrade? Sua VPN de R$ {value} pode ser atualizada para o plano Premium com servidores mais rápidos e proteção avançada. Consulte nossos planos!',
+        'type': 'promo',
+        'plan_type': 'VPN'
     }
 ]

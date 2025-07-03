@@ -13,20 +13,19 @@
 </div>
 
 <!-- Main Statistics Cards -->
-<div class="row mb-4">
+<div class="row mb-4 animate-slideInUp">
     <div class="col-lg-3 col-md-6 mb-3">
-        <div class="card bg-primary h-100">
-            <div class="card-body">
-                <div class="d-flex justify-content-between">
-                    <div>
-                        <h6 class="card-title">Total de Clientes</h6>
-                        <h3 class="card-text">{{ total_clients }}</h3>
-                        <small>
-                            <i class="bi bi-check-circle"></i> {{ active_clients }} ativos
-                        </small>
+        <div class="stat-card hover-lift">
+            <div class="d-flex justify-content-between align-items-start">
+                <div>
+                    <div class="stat-icon primary mb-3">
+                        <i class="bi bi-people"></i>
                     </div>
-                    <div class="align-self-center">
-                        <i class="bi bi-people fs-1"></i>
+                    <div class="stat-number text-gradient">{{ total_clients }}</div>
+                    <div class="stat-label">Total de Clientes</div>
+                    <div class="stat-change positive">
+                        <i class="bi bi-arrow-up"></i>
+                        {{ active_clients }} ativos
                     </div>
                 </div>
             </div>
@@ -34,37 +33,17 @@
     </div>
     
     <div class="col-lg-3 col-md-6 mb-3">
-        <div class="card bg-success h-100">
-            <div class="card-body">
-                <div class="d-flex justify-content-between">
-                    <div>
-                        <h6 class="card-title">Receita Ativa</h6>
-                        <h3 class="card-text">R$ {{ "%.2f"|format(active_revenue) }}</h3>
-                        <small>
-                            <i class="bi bi-graph-up"></i> Total: R$ {{ "%.2f"|format(total_value) }}
-                        </small>
+        <div class="stat-card hover-lift">
+            <div class="d-flex justify-content-between align-items-start">
+                <div>
+                    <div class="stat-icon success mb-3">
+                        <i class="bi bi-currency-dollar"></i>
                     </div>
-                    <div class="align-self-center">
-                        <i class="bi bi-currency-dollar fs-1"></i>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-    
-    <div class="col-lg-3 col-md-6 mb-3">
-        <div class="card bg-warning h-100">
-            <div class="card-body">
-                <div class="d-flex justify-content-between">
-                    <div>
-                        <h6 class="card-title">Vencendo</h6>
-                        <h3 class="card-text">{{ expiring_clients }}</h3>
-                        <small>
-                            <i class="bi bi-clock"></i> Próximos a vencer
-                        </small>
-                    </div>
-                    <div class="align-self-center">
-                        <i class="bi bi-exclamation-triangle fs-1"></i>
+                    <div class="stat-number text-gradient">R$ {{ "%.0f"|format(active_revenue) }}</div>
+                    <div class="stat-label">Receita Ativa</div>
+                    <div class="stat-change positive">
+                        <i class="bi bi-graph-up"></i>
+                        Total: R$ {{ "%.0f"|format(total_value) }}
                     </div>
                 </div>
             </div>
@@ -72,18 +51,35 @@
     </div>
     
     <div class="col-lg-3 col-md-6 mb-3">
-        <div class="card bg-danger h-100">
-            <div class="card-body">
-                <div class="d-flex justify-content-between">
-                    <div>
-                        <h6 class="card-title">Expirados</h6>
-                        <h3 class="card-text">{{ expired_clients }}</h3>
-                        <small>
-                            <i class="bi bi-x-circle"></i> Renovação necessária
-                        </small>
+        <div class="stat-card hover-lift">
+            <div class="d-flex justify-content-between align-items-start">
+                <div>
+                    <div class="stat-icon warning mb-3">
+                        <i class="bi bi-clock"></i>
                     </div>
-                    <div class="align-self-center">
-                        <i class="bi bi-ban fs-1"></i>
+                    <div class="stat-number text-gradient">{{ expiring_clients }}</div>
+                    <div class="stat-label">Vencendo</div>
+                    <div class="stat-change">
+                        <i class="bi bi-exclamation-triangle"></i>
+                        Próximos a vencer
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-lg-3 col-md-6 mb-3">
+        <div class="stat-card hover-lift">
+            <div class="d-flex justify-content-between align-items-start">
+                <div>
+                    <div class="stat-icon danger mb-3">
+                        <i class="bi bi-x-circle"></i>
+                    </div>
+                    <div class="stat-number text-gradient">{{ expired_clients }}</div>
+                    <div class="stat-label">Expirados</div>
+                    <div class="stat-change negative">
+                        <i class="bi bi-arrow-down"></i>
+                        Renovação necessária
                     </div>
                 </div>
             </div>
@@ -92,45 +88,71 @@
 </div>
 
 <!-- Category Breakdown -->
-<div class="row mb-4">
-    <div class="col-md-6">
-        <div class="card">
+<div class="row mb-4 animate-fadeIn">
+    <div class="col-md-6 mb-3">
+        <div class="card hover-lift border-start border-info border-3">
             <div class="card-header">
-                <h5><i class="bi bi-tv"></i> IPTV - Detalhes</h5>
+                <h5 class="mb-0">
+                    <i class="bi bi-tv text-info me-2"></i>
+                    IPTV - Detalhes
+                </h5>
             </div>
             <div class="card-body">
-                <div class="row">
+                <div class="row g-4">
                     <div class="col-6">
-                        <h3 class="text-info">{{ active_iptv_count }}</h3>
-                        <p class="text-muted mb-1">Clientes Ativos</p>
-                        <small class="text-muted">Total: {{ iptv_count }} clientes</small>
+                        <div class="text-center">
+                            <div class="display-6 text-info fw-bold mb-2">{{ active_iptv_count }}</div>
+                            <div class="fw-semibold text-muted mb-1">Clientes Ativos</div>
+                            <small class="text-muted">
+                                <i class="bi bi-people me-1"></i>
+                                Total: {{ iptv_count }} clientes
+                            </small>
+                        </div>
                     </div>
                     <div class="col-6">
-                        <h3 class="text-info">R$ {{ "%.2f"|format(active_iptv_revenue) }}</h3>
-                        <p class="text-muted mb-1">Receita Ativa</p>
-                        <small class="text-muted">Total: R$ {{ "%.2f"|format(iptv_value) }}</small>
+                        <div class="text-center">
+                            <div class="display-6 text-info fw-bold mb-2">R$ {{ "%.0f"|format(active_iptv_revenue) }}</div>
+                            <div class="fw-semibold text-muted mb-1">Receita Ativa</div>
+                            <small class="text-muted">
+                                <i class="bi bi-currency-dollar me-1"></i>
+                                Total: R$ {{ "%.0f"|format(iptv_value) }}
+                            </small>
+                        </div>
                     </div>
                 </div>
             </div>
         </div>
     </div>
     
-    <div class="col-md-6">
-        <div class="card">
+    <div class="col-md-6 mb-3">
+        <div class="card hover-lift border-start border-secondary border-3">
             <div class="card-header">
-                <h5><i class="bi bi-shield-lock"></i> VPN - Detalhes</h5>
+                <h5 class="mb-0">
+                    <i class="bi bi-shield-lock text-secondary me-2"></i>
+                    VPN - Detalhes
+                </h5>
             </div>
             <div class="card-body">
-                <div class="row">
+                <div class="row g-4">
                     <div class="col-6">
-                        <h3 class="text-secondary">{{ active_vpn_count }}</h3>
-                        <p class="text-muted mb-1">Clientes Ativos</p>
-                        <small class="text-muted">Total: {{ vpn_count }} clientes</small>
+                        <div class="text-center">
+                            <div class="display-6 text-secondary fw-bold mb-2">{{ active_vpn_count }}</div>
+                            <div class="fw-semibold text-muted mb-1">Clientes Ativos</div>
+                            <small class="text-muted">
+                                <i class="bi bi-people me-1"></i>
+                                Total: {{ vpn_count }} clientes
+                            </small>
+                        </div>
                     </div>
                     <div class="col-6">
-                        <h3 class="text-secondary">R$ {{ "%.2f"|format(active_vpn_revenue) }}</h3>
-                        <p class="text-muted mb-1">Receita Ativa</p>
-                        <small class="text-muted">Total: R$ {{ "%.2f"|format(vpn_value) }}</small>
+                        <div class="text-center">
+                            <div class="display-6 text-secondary fw-bold mb-2">R$ {{ "%.0f"|format(active_vpn_revenue) }}</div>
+                            <div class="fw-semibold text-muted mb-1">Receita Ativa</div>
+                            <small class="text-muted">
+                                <i class="bi bi-currency-dollar me-1"></i>
+                                Total: R$ {{ "%.0f"|format(vpn_value) }}
+                            </small>
+                        </div>
                     </div>
                 </div>
             </div>
