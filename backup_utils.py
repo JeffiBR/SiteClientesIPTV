@@ -5,6 +5,7 @@ import shutil
 from datetime import datetime, timedelta
 from typing import List, Dict, Any, Optional
 from pathlib import Path
+from functools import wraps
 import logging
 from models import Client, MessageTemplate
 
@@ -400,6 +401,7 @@ def auto_backup_before_changes(data_type: str = 'system'):
         data_type: Tipo de backup ('clients', 'templates', 'system')
     """
     def decorator(func):
+        @wraps(func)
         def wrapper(*args, **kwargs):
             try:
                 # Criar backup antes da modificação
