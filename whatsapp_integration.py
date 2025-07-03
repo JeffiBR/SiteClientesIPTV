@@ -1,6 +1,5 @@
 import os
 import logging
-import qrcode
 import io
 import base64
 import uuid
@@ -11,6 +10,14 @@ from datetime import datetime, timedelta
 from typing import Optional, Dict, List
 import json
 import traceback
+
+# Try to import qrcode with fallback
+try:
+    import qrcode
+    QRCODE_AVAILABLE = True
+except ImportError:
+    QRCODE_AVAILABLE = False
+    logging.warning("qrcode module not available - QR code generation will be disabled")
 
 logger = logging.getLogger(__name__)
 
