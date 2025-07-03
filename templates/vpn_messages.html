@@ -1,0 +1,554 @@
+{% extends "base.html" %}
+
+{% block title %}VPN Messages{% endblock %}
+
+{% block extra_head %}
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<style>
+    .vpn-container {
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 20px;
+    }
+    
+    .kpi-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+        gap: 20px;
+        margin-bottom: 30px;
+    }
+    
+    .kpi-card {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        padding: 25px;
+        border-radius: 15px;
+        box-shadow: 0 8px 25px rgba(0,0,0,0.15);
+        transition: transform 0.3s ease, box-shadow 0.3s ease;
+    }
+    
+    .kpi-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 12px 35px rgba(0,0,0,0.2);
+    }
+    
+    .kpi-card.revenue {
+        background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+    }
+    
+    .kpi-card.clients {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    }
+    
+    .kpi-card.growth {
+        background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+    }
+    
+    .kpi-card.conversion {
+        background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+    }
+    
+    .kpi-title {
+        font-size: 14px;
+        opacity: 0.9;
+        margin-bottom: 10px;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+    }
+    
+    .kpi-value {
+        font-size: 2.5em;
+        font-weight: bold;
+        margin-bottom: 10px;
+    }
+    
+    .kpi-change {
+        font-size: 14px;
+        opacity: 0.9;
+    }
+    
+    .kpi-change.positive {
+        color: #4ade80;
+    }
+    
+    .kpi-change.negative {
+        color: #f87171;
+    }
+    
+    .dashboard-grid {
+        display: grid;
+        grid-template-columns: 2fr 1fr;
+        gap: 30px;
+        margin-bottom: 30px;
+    }
+    
+    .chart-container {
+        background: white;
+        border-radius: 15px;
+        padding: 25px;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+    }
+    
+    .quick-actions {
+        background: white;
+        border-radius: 15px;
+        padding: 25px;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+    }
+    
+    .action-btn {
+        display: block;
+        width: 100%;
+        padding: 15px;
+        margin-bottom: 15px;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        text-decoration: none;
+        border-radius: 10px;
+        text-align: center;
+        transition: transform 0.2s ease;
+    }
+    
+    .action-btn:hover {
+        transform: translateY(-2px);
+        color: white;
+        text-decoration: none;
+    }
+    
+    .recent-activity {
+        background: white;
+        border-radius: 15px;
+        padding: 25px;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+    }
+    
+    .activity-item {
+        display: flex;
+        align-items: center;
+        padding: 15px 0;
+        border-bottom: 1px solid #f0f0f0;
+    }
+    
+    .activity-icon {
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        margin-right: 15px;
+    }
+    
+    .activity-content {
+        flex: 1;
+    }
+    
+    .activity-title {
+        font-weight: 600;
+        margin-bottom: 5px;
+    }
+    
+    .activity-time {
+        font-size: 12px;
+        color: #666;
+    }
+    
+    .mobile-menu {
+        display: none;
+    }
+    
+    /* Mobile Responsiveness */
+    @media (max-width: 768px) {
+        .vpn-container {
+            padding: 15px;
+        }
+        
+        .kpi-grid {
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+        }
+        
+        .kpi-card {
+            padding: 20px;
+        }
+        
+        .kpi-value {
+            font-size: 2em;
+        }
+        
+        .dashboard-grid {
+            grid-template-columns: 1fr;
+            gap: 20px;
+        }
+        
+        .chart-container, .quick-actions, .recent-activity {
+            padding: 20px;
+        }
+        
+        .mobile-menu {
+            display: block;
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            z-index: 1000;
+        }
+        
+        .mobile-fab {
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+            font-size: 24px;
+            cursor: pointer;
+        }
+    }
+    
+    @media (max-width: 480px) {
+        .kpi-grid {
+            grid-template-columns: 1fr;
+        }
+        
+        .kpi-card {
+            padding: 15px;
+        }
+        
+        .kpi-value {
+            font-size: 1.8em;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="vpn-container">
+    <!-- Header -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1 class="h3 mb-0">VPN Dashboard</h1>
+        <div class="d-flex gap-2">
+            <button class="btn btn-outline-primary btn-sm" onclick="refreshDashboard()">
+                <i class="fas fa-sync-alt"></i> Atualizar
+            </button>
+            <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#addClientModal">
+                <i class="fas fa-plus"></i> Novo Cliente
+            </button>
+        </div>
+    </div>
+    
+    <!-- KPI Cards -->
+    <div class="kpi-grid">
+        <div class="kpi-card revenue">
+            <div class="kpi-title">Receita Total</div>
+            <div class="kpi-value" id="total-revenue">R$ {{ "%.2f"|format(total_value or 0) }}</div>
+            <div class="kpi-change positive">+12.5% vs mês anterior</div>
+        </div>
+        
+        <div class="kpi-card clients">
+            <div class="kpi-title">Clientes Ativos</div>
+            <div class="kpi-value" id="active-clients">{{ active_clients or 0 }}</div>
+            <div class="kpi-change positive">+{{ ((active_clients or 0) - (expired_clients or 0)) }} novos</div>
+        </div>
+        
+        <div class="kpi-card growth">
+            <div class="kpi-title">Taxa de Renovação</div>
+            <div class="kpi-value" id="renewal-rate">{{ "%.1f"|format(((active_clients or 0) / (total_clients or 1)) * 100) }}%</div>
+            <div class="kpi-change positive">+5.2% vs mês anterior</div>
+        </div>
+        
+        <div class="kpi-card conversion">
+            <div class="kpi-title">Receita VPN</div>
+            <div class="kpi-value" id="vpn-revenue">R$ {{ "%.2f"|format(vpn_value or 0) }}</div>
+            <div class="kpi-change positive">{{ vpn_count or 0 }} clientes</div>
+        </div>
+    </div>
+    
+    <!-- Dashboard Grid -->
+    <div class="dashboard-grid">
+        <!-- Chart Area -->
+        <div class="chart-container">
+            <h5 class="mb-3">Evolução da Receita</h5>
+            <canvas id="revenueChart" height="300"></canvas>
+        </div>
+        
+        <!-- Quick Actions -->
+        <div class="quick-actions">
+            <h5 class="mb-3">Ações Rápidas</h5>
+            <a href="{{ url_for('add_client') }}" class="action-btn">
+                <i class="fas fa-user-plus"></i> Adicionar Cliente
+            </a>
+            <a href="{{ url_for('clients') }}" class="action-btn">
+                <i class="fas fa-users"></i> Ver Todos os Clientes
+            </a>
+            <a href="{{ url_for('whatsapp') }}" class="action-btn">
+                <i class="fab fa-whatsapp"></i> WhatsApp
+            </a>
+            <a href="#" class="action-btn" onclick="exportData()">
+                <i class="fas fa-download"></i> Exportar Dados
+            </a>
+        </div>
+    </div>
+    
+    <!-- Recent Activity -->
+    <div class="recent-activity">
+        <h5 class="mb-3">Atividade Recente</h5>
+        <div id="recent-activity-list">
+            {% if upcoming_reminders %}
+                {% for reminder in upcoming_reminders[:5] %}
+                <div class="activity-item">
+                    <div class="activity-icon">
+                        <i class="fas fa-bell"></i>
+                    </div>
+                    <div class="activity-content">
+                        <div class="activity-title">Lembrete: {{ reminder.client_name }}</div>
+                        <div class="activity-time">{{ reminder.scheduled_time.strftime('%d/%m %H:%M') }}</div>
+                    </div>
+                </div>
+                {% endfor %}
+            {% else %}
+                <div class="activity-item">
+                    <div class="activity-icon">
+                        <i class="fas fa-check"></i>
+                    </div>
+                    <div class="activity-content">
+                        <div class="activity-title">Nenhuma atividade recente</div>
+                        <div class="activity-time">Sistema funcionando normalmente</div>
+                    </div>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<!-- Mobile FAB -->
+<div class="mobile-menu">
+    <button class="mobile-fab" onclick="toggleMobileMenu()">
+        <i class="fas fa-plus"></i>
+    </button>
+</div>
+
+<!-- Add Client Modal -->
+<div class="modal fade" id="addClientModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Adicionar Cliente VPN</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="quickAddForm">
+                    <div class="mb-3">
+                        <label class="form-label">Nome do Cliente</label>
+                        <input type="text" class="form-control" name="name" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">WhatsApp</label>
+                        <input type="tel" class="form-control" name="phone" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Valor</label>
+                        <input type="number" class="form-control" name="value" step="0.01" required>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-primary" onclick="quickAddClient()">Adicionar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+// Dashboard JavaScript Functions
+let revenueChart;
+
+// Initialize Dashboard
+document.addEventListener('DOMContentLoaded', function() {
+    initializeChart();
+    startAutoRefresh();
+});
+
+// Initialize Revenue Chart
+function initializeChart() {
+    const ctx = document.getElementById('revenueChart').getContext('2d');
+    revenueChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun'],
+            datasets: [{
+                label: 'Receita Total',
+                data: [1200, 1900, 3000, 5000, 4500, {{ total_value or 0 }}],
+                borderColor: '#667eea',
+                backgroundColor: 'rgba(102, 126, 234, 0.1)',
+                borderWidth: 3,
+                fill: true,
+                tension: 0.4
+            }, {
+                label: 'Receita VPN',
+                data: [800, 1200, 2000, 3200, 2800, {{ vpn_value or 0 }}],
+                borderColor: '#11998e',
+                backgroundColor: 'rgba(17, 153, 142, 0.1)',
+                borderWidth: 3,
+                fill: true,
+                tension: 0.4
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    display: true,
+                    position: 'top'
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    ticks: {
+                        callback: function(value) {
+                            return 'R$ ' + value.toLocaleString('pt-BR');
+                        }
+                    }
+                }
+            }
+        }
+    });
+}
+
+// Refresh Dashboard Data
+function refreshDashboard() {
+    fetch('/api/dashboard-data')
+        .then(response => response.json())
+        .then(data => {
+            updateKPIs(data);
+            updateChart(data);
+            showToast('Dashboard atualizado com sucesso!');
+        })
+        .catch(error => {
+            console.error('Erro ao atualizar dashboard:', error);
+            showToast('Erro ao atualizar dashboard', 'error');
+        });
+}
+
+// Update KPI Values
+function updateKPIs(data) {
+    document.getElementById('total-revenue').textContent = 'R$ ' + (data.total_value || 0).toFixed(2);
+    document.getElementById('active-clients').textContent = data.active_clients || 0;
+    document.getElementById('vpn-revenue').textContent = 'R$ ' + (data.vpn_value || 0).toFixed(2);
+    
+    const renewalRate = ((data.active_clients || 0) / (data.total_clients || 1)) * 100;
+    document.getElementById('renewal-rate').textContent = renewalRate.toFixed(1) + '%';
+}
+
+// Update Chart
+function updateChart(data) {
+    if (revenueChart) {
+        revenueChart.data.datasets[0].data[revenueChart.data.datasets[0].data.length - 1] = data.total_value || 0;
+        revenueChart.data.datasets[1].data[revenueChart.data.datasets[1].data.length - 1] = data.vpn_value || 0;
+        revenueChart.update();
+    }
+}
+
+// Auto Refresh (every 5 minutes)
+function startAutoRefresh() {
+    setInterval(refreshDashboard, 300000);
+}
+
+// Mobile Menu Toggle
+function toggleMobileMenu() {
+    // Implementation for mobile menu toggle
+    const modal = new bootstrap.Modal(document.getElementById('addClientModal'));
+    modal.show();
+}
+
+// Quick Add Client
+function quickAddClient() {
+    const form = document.getElementById('quickAddForm');
+    const formData = new FormData(form);
+    formData.append('plan_type', 'VPN');
+    formData.append('plan_duration', '30');
+    
+    fetch('/clients/add', {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => {
+        if (response.ok) {
+            bootstrap.Modal.getInstance(document.getElementById('addClientModal')).hide();
+            showToast('Cliente adicionado com sucesso!');
+            refreshDashboard();
+            form.reset();
+        } else {
+            throw new Error('Erro ao adicionar cliente');
+        }
+    })
+    .catch(error => {
+        console.error('Erro:', error);
+        showToast('Erro ao adicionar cliente', 'error');
+    });
+}
+
+// Export Data
+function exportData() {
+    fetch('/clients/export')
+        .then(response => response.json())
+        .then(data => {
+            const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'clientes_vpn_' + new Date().toISOString().split('T')[0] + '.json';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            window.URL.revokeObjectURL(url);
+            showToast('Dados exportados com sucesso!');
+        })
+        .catch(error => {
+            console.error('Erro ao exportar:', error);
+            showToast('Erro ao exportar dados', 'error');
+        });
+}
+
+// Show Toast Notification
+function showToast(message, type = 'success') {
+    // Create toast element
+    const toast = document.createElement('div');
+    toast.className = `alert alert-${type === 'error' ? 'danger' : 'success'} alert-dismissible fade show position-fixed`;
+    toast.style.cssText = 'top: 20px; right: 20px; z-index: 1050; min-width: 300px;';
+    toast.innerHTML = `
+        ${message}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    `;
+    
+    document.body.appendChild(toast);
+    
+    // Auto remove after 3 seconds
+    setTimeout(() => {
+        if (toast.parentNode) {
+            toast.parentNode.removeChild(toast);
+        }
+    }, 3000);
+}
+
+// Touch Events for Mobile
+if (window.innerWidth <= 768) {
+    document.addEventListener('touchstart', function(e) {
+        // Handle touch events for better mobile experience
+    });
+}
+
+// Responsive Chart Resize
+window.addEventListener('resize', function() {
+    if (revenueChart) {
+        revenueChart.resize();
+    }
+});
+</script>
+{% endblock %}

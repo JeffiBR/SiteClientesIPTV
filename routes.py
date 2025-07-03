@@ -612,3 +612,460 @@ def export_clients():
     except Exception as e:
         logger.error(f"Error exporting clients: {str(e)}")
         return jsonify({'error': str(e)}), 500
+
+# VPN Dashboard Routes
+@app.route('/vpn/dashboard')
+def vpn_dashboard():
+    """VPN specific dashboard with enhanced KPIs"""
+    client_ip = get_client_ip()
+    
+    try:
+        # Get VPN specific statistics
+        clients = storage.get_clients()
+        vpn_clients = [c for c in clients if c.plan_type == 'VPN']
+        
+        # Calculate VPN-specific KPIs
+        total_vpn_value = sum(client.value for client in vpn_clients)
+        active_vpn_clients = [c for c in vpn_clients if c.status == 'ativo']
+        expiring_vpn_clients = [c for c in vpn_clients if c.status == 'vencendo']
+        expired_vpn_clients = [c for c in vpn_clients if c.status == 'expirado']
+        
+        vpn_stats = {
+            'total_value': total_vpn_value,
+            'vpn_value': total_vpn_value,
+            'vpn_count': len(vpn_clients),
+            'total_clients': len(vpn_clients),
+            'active_clients': len(active_vpn_clients),
+            'expiring_clients': len(expiring_vpn_clients),
+            'expired_clients': len(expired_vpn_clients),
+            'active_revenue': sum(c.value for c in active_vpn_clients),
+            'conversion_rate': (len(active_vpn_clients) / len(vpn_clients) * 100) if vpn_clients else 0
+        }
+        
+        # Get upcoming reminders for VPN clients
+        upcoming_reminders = get_upcoming_reminders()
+        vpn_reminders = [r for r in upcoming_reminders if any(c.id == r.client_id and c.plan_type == 'VPN' for c in clients)]
+        
+        return render_template('vpn_messages.html', 
+                             upcoming_reminders=vpn_reminders,
+                             **vpn_stats)
+                             
+    except Exception as e:
+        app_logger.log_error(e, context="vpn_dashboard_load", user_ip=client_ip)
+        flash('Erro ao carregar dashboard VPN', 'error')
+        return render_template('vpn_messages.html', 
+                             total_value=0, vpn_value=0, vpn_count=0,
+                             total_clients=0, active_clients=0, 
+                             expiring_clients=0, expired_clients=0,
+                             upcoming_reminders=[])
+
+@app.route('/api/vpn/stats')
+def api_vpn_stats():
+    """API endpoint for VPN-specific statistics"""
+    client_ip = get_client_ip()
+    
+    # Rate limiting
+    if not rate_limit_api(limit=30).is_allowed(client_ip):
+        return jsonify({'error': 'Rate limit exceeded'}), 429
+    
+    try:
+        clients = storage.get_clients()
+        vpn_clients = [c for c in clients if c.plan_type == 'VPN']
+        
+        # Calculate comprehensive VPN statistics
+        total_vpn_value = sum(client.value for client in vpn_clients)
+        active_vpn = [c for c in vpn_clients if c.status == 'ativo']
+        expiring_vpn = [c for c in vpn_clients if c.status == 'vencendo']
+        expired_vpn = [c for c in vpn_clients if c.status == 'expirado']
+        
+        # Monthly growth calculation (mock data for now)
+        current_month_revenue = total_vpn_value
+        last_month_revenue = total_vpn_value * 0.88  # Simulate 12% growth
+        growth_percentage = ((current_month_revenue - last_month_revenue) / last_month_revenue * 100) if last_month_revenue > 0 else 0
+        
+        # Renewal rate calculation
+        total_eligible_for_renewal = len([c for c in vpn_clients if c.status in ['ativo', 'vencendo']])
+        renewed_clients = len(active_vpn)
+        renewal_rate = (renewed_clients / total_eligible_for_renewal * 100) if total_eligible_for_renewal > 0 else 0
+        
+        stats = {
+            'total_vpn_revenue': total_vpn_value,
+            'active_vpn_clients': len(active_vpn),
+            'expiring_vpn_clients': len(expiring_vpn),
+            'expired_vpn_clients': len(expired_vpn),
+            'total_vpn_clients': len(vpn_clients),
+            'active_vpn_revenue': sum(c.value for c in active_vpn),
+            'growth_percentage': growth_percentage,
+            'renewal_rate': renewal_rate,
+            'conversion_rate': (len(active_vpn) / len(vpn_clients) * 100) if vpn_clients else 0,
+            'average_vpn_value': total_vpn_value / len(vpn_clients) if vpn_clients else 0,
+            'monthly_trend': [
+                {'month': 'Jan', 'revenue': total_vpn_value * 0.7, 'clients': len(vpn_clients) - 15},
+                {'month': 'Fev', 'revenue': total_vpn_value * 0.75, 'clients': len(vpn_clients) - 12},
+                {'month': 'Mar', 'revenue': total_vpn_value * 0.82, 'clients': len(vpn_clients) - 8},
+                {'month': 'Abr', 'revenue': total_vpn_value * 0.88, 'clients': len(vpn_clients) - 5},
+                {'month': 'Mai', 'revenue': total_vpn_value * 0.94, 'clients': len(vpn_clients) - 2},
+                {'month': 'Jun', 'revenue': total_vpn_value, 'clients': len(vpn_clients)}
+            ]
+        }
+        
+        return jsonify(stats)
+        
+    except Exception as e:
+        logger.error(f"Error getting VPN stats: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/vpn/clients')
+def api_vpn_clients():
+    """API endpoint for VPN clients data"""
+    client_ip = get_client_ip()
+    
+    # Rate limiting
+    if not rate_limit_api(limit=20).is_allowed(client_ip):
+        return jsonify({'error': 'Rate limit exceeded'}), 429
+    
+    try:
+        clients = storage.get_clients()
+        vpn_clients = [c for c in clients if c.plan_type == 'VPN']
+        
+        # Prepare client data for API response
+        client_data = []
+        for client in vpn_clients:
+            client_data.append({
+                'id': client.id,
+                'name': client.name,
+                'phone': client.phone,
+                'status': client.status,
+                'value': client.value,
+                'plan_duration': client.plan_duration,
+                'created_at': client.created_at.isoformat() if hasattr(client, 'created_at') else None,
+                'expiration_date': client.get_expiration_date().isoformat() if hasattr(client, 'get_expiration_date') else None
+            })
+        
+        return jsonify({
+            'clients': client_data,
+            'total_count': len(vpn_clients),
+            'active_count': len([c for c in vpn_clients if c.status == 'ativo']),
+            'total_revenue': sum(c.value for c in vpn_clients)
+        })
+        
+    except Exception as e:
+        logger.error(f"Error getting VPN clients: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/vpn/reports')
+def vpn_reports():
+    """VPN reports and analytics page"""
+    try:
+        clients = storage.get_clients()
+        vpn_clients = [c for c in clients if c.plan_type == 'VPN']
+        
+        # Generate report data
+        report_data = {
+            'total_clients': len(vpn_clients),
+            'total_revenue': sum(c.value for c in vpn_clients),
+            'average_value': sum(c.value for c in vpn_clients) / len(vpn_clients) if vpn_clients else 0,
+            'status_breakdown': {
+                'active': len([c for c in vpn_clients if c.status == 'ativo']),
+                'expiring': len([c for c in vpn_clients if c.status == 'vencendo']),
+                'expired': len([c for c in vpn_clients if c.status == 'expirado'])
+            }
+        }
+        
+        return render_template('vpn_reports.html', report_data=report_data)
+        
+    except Exception as e:
+        logger.error(f"Error loading VPN reports: {str(e)}")
+        flash('Erro ao carregar relatórios VPN', 'error')
+        return redirect(url_for('dashboard'))
+
+# Mobile API endpoints
+@app.route('/api/mobile/dashboard')
+def api_mobile_dashboard():
+    """Mobile-optimized dashboard API"""
+    client_ip = get_client_ip()
+    
+    # Rate limiting
+    if not rate_limit_api(limit=60).is_allowed(client_ip):
+        return jsonify({'error': 'Rate limit exceeded'}), 429
+    
+    try:
+        clients = storage.get_clients()
+        
+        # Simplified data for mobile
+        mobile_data = {
+            'summary': {
+                'total_clients': len(clients),
+                'total_revenue': sum(c.value for c in clients),
+                'active_clients': len([c for c in clients if c.status == 'ativo']),
+                'alerts': len([c for c in clients if c.status == 'vencendo'])
+            },
+            'quick_stats': {
+                'vpn_clients': len([c for c in clients if c.plan_type == 'VPN']),
+                'iptv_clients': len([c for c in clients if c.plan_type == 'IPTV']),
+                'vpn_revenue': sum(c.value for c in clients if c.plan_type == 'VPN'),
+                'iptv_revenue': sum(c.value for c in clients if c.plan_type == 'IPTV')
+            },
+            'recent_activity': get_recent_activity(5),
+            'upcoming_tasks': get_upcoming_reminders()[:3]
+        }
+        
+        return jsonify(mobile_data)
+        
+    except Exception as e:
+        logger.error(f"Error getting mobile dashboard data: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
+def get_recent_activity(limit=10):
+    """Get recent activity for dashboard"""
+    try:
+        # This would typically come from a database log
+        # For now, return mock data
+        activity = [
+            {
+                'type': 'client_added',
+                'description': 'Novo cliente VPN adicionado',
+                'timestamp': datetime.now().isoformat(),
+                'icon': 'fas fa-user-plus'
+            },
+            {
+                'type': 'payment_received',
+                'description': 'Pagamento recebido - Cliente VPN',
+                'timestamp': datetime.now().isoformat(),
+                'icon': 'fas fa-dollar-sign'
+            }
+        ]
+        
+        return activity[:limit]
+        
+    except Exception as e:
+        logger.error(f"Error getting recent activity: {str(e)}")
+        return []
+
+# Analytics and reporting functions
+@app.route('/api/analytics/revenue-trend')
+def api_revenue_trend():
+    """API endpoint for revenue trend analytics"""
+    client_ip = get_client_ip()
+    
+    # Rate limiting
+    if not rate_limit_api(limit=10).is_allowed(client_ip):
+        return jsonify({'error': 'Rate limit exceeded'}), 429
+    
+    try:
+        # Get time period from query params
+        period = request.args.get('period', '6months')
+        service_type = request.args.get('type', 'all')
+        
+        clients = storage.get_clients()
+        
+        if service_type == 'vpn':
+            clients = [c for c in clients if c.plan_type == 'VPN']
+        elif service_type == 'iptv':
+            clients = [c for c in clients if c.plan_type == 'IPTV']
+        
+        # Generate trend data (mock implementation)
+        total_revenue = sum(c.value for c in clients)
+        
+        trend_data = {
+            'labels': ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun'],
+            'datasets': [{
+                'label': 'Receita',
+                'data': [
+                    total_revenue * 0.6,
+                    total_revenue * 0.7,
+                    total_revenue * 0.8,
+                    total_revenue * 0.85,
+                    total_revenue * 0.92,
+                    total_revenue
+                ],
+                'borderColor': '#667eea',
+                'backgroundColor': 'rgba(102, 126, 234, 0.1)'
+            }]
+        }
+        
+        return jsonify(trend_data)
+        
+    except Exception as e:
+        logger.error(f"Error getting revenue trend: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
+# WebSocket-like real-time updates (using polling for now)
+@app.route('/api/realtime/updates')
+def api_realtime_updates():
+    """API endpoint for real-time updates"""
+    client_ip = get_client_ip()
+    
+    # Rate limiting for frequent polling
+    if not rate_limit_api(limit=120).is_allowed(client_ip):
+        return jsonify({'error': 'Rate limit exceeded'}), 429
+    
+    try:
+        # Get last update timestamp
+        last_update = request.args.get('last_update')
+        
+        updates = {
+            'timestamp': datetime.now().isoformat(),
+            'has_updates': False,
+            'updates': [],
+            'notifications': []
+        }
+        
+        # Check for new notifications or updates
+        # This is a simplified implementation
+        upcoming_reminders = get_upcoming_reminders()
+        if upcoming_reminders:
+            updates['has_updates'] = True
+            updates['notifications'] = [
+                {
+                    'type': 'reminder',
+                    'message': f'Lembrete para {r.client_name}',
+                    'time': r.scheduled_time.isoformat()
+                } for r in upcoming_reminders[:3]
+            ]
+        
+        return jsonify(updates)
+        
+    except Exception as e:
+        logger.error(f"Error getting real-time updates: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
+# Error handlers
+@app.errorhandler(404)
+def not_found_error(error):
+    """Handle 404 errors"""
+    return render_template('404.html'), 404
+
+@app.errorhandler(500)
+def internal_error(error):
+    """Handle 500 errors"""
+    logger.error(f"Internal server error: {str(error)}")
+    return render_template('500.html'), 500
+
+# Health check with enhanced monitoring
+@app.route('/api/health/detailed')
+def detailed_health():
+    """Detailed health check for monitoring"""
+    try:
+        # Check all system components
+        health_status = {
+            'status': 'healthy',
+            'timestamp': datetime.now().isoformat(),
+            'components': {
+                'database': check_storage_health(),
+                'whatsapp': check_whatsapp_health(),
+                'scheduler': check_scheduler_health(),
+                'cache': check_cache_health()
+            },
+            'metrics': {
+                'total_clients': len(storage.get_clients()),
+                'active_connections': 1,  # Simplified
+                'memory_usage': get_memory_usage(),
+                'uptime': get_uptime()
+            }
+        }
+        
+        # Determine overall status
+        component_statuses = [comp.get('status', 'unknown') for comp in health_status['components'].values()]
+        if 'error' in component_statuses:
+            health_status['status'] = 'error'
+        elif 'warning' in component_statuses:
+            health_status['status'] = 'warning'
+        
+        status_code = 200 if health_status['status'] == 'healthy' else 503
+        return jsonify(health_status), status_code
+        
+    except Exception as e:
+        return jsonify({
+            'status': 'error',
+            'timestamp': datetime.now().isoformat(),
+            'error': str(e)
+        }), 503
+
+def check_storage_health():
+    """Check GitHub storage health"""
+    try:
+        # Try to fetch clients to test storage
+        clients = storage.get_clients()
+        return {
+            'status': 'healthy',
+            'client_count': len(clients),
+            'last_check': datetime.now().isoformat()
+        }
+    except Exception as e:
+        return {
+            'status': 'error',
+            'error': str(e),
+            'last_check': datetime.now().isoformat()
+        }
+
+def check_whatsapp_health():
+    """Check WhatsApp integration health"""
+    try:
+        connected = is_whatsapp_connected()
+        return {
+            'status': 'healthy' if connected else 'warning',
+            'connected': connected,
+            'last_check': datetime.now().isoformat()
+        }
+    except Exception as e:
+        return {
+            'status': 'error',
+            'error': str(e),
+            'last_check': datetime.now().isoformat()
+        }
+
+def check_scheduler_health():
+    """Check scheduler health"""
+    try:
+        return {
+            'status': 'healthy' if scheduler.running else 'error',
+            'running': scheduler.running,
+            'job_count': len(scheduler.get_jobs()),
+            'last_check': datetime.now().isoformat()
+        }
+    except Exception as e:
+        return {
+            'status': 'error',
+            'error': str(e),
+            'last_check': datetime.now().isoformat()
+        }
+
+def check_cache_health():
+    """Check cache health"""
+    try:
+        from simple_cache import get_cache_health
+        return get_cache_health()
+    except Exception as e:
+        return {
+            'status': 'error',
+            'error': str(e),
+            'last_check': datetime.now().isoformat()
+        }
+
+def get_memory_usage():
+    """Get current memory usage (simplified)"""
+    try:
+        import psutil
+        process = psutil.Process()
+        memory_info = process.memory_info()
+        return {
+            'rss': memory_info.rss,
+            'vms': memory_info.vms,
+            'percent': process.memory_percent()
+        }
+    except ImportError:
+        return {'error': 'psutil not available'}
+    except Exception:
+        return {'error': 'Unable to get memory info'}
+
+def get_uptime():
+    """Get application uptime (simplified)"""
+    try:
+        # This would typically be calculated from app start time
+        return {
+            'seconds': 3600,  # Mock data
+            'formatted': '1h 0m 0s'
+        }
+    except Exception:
+        return {'error': 'Unable to get uptime'}
