@@ -496,44 +496,93 @@ def system_status():
                              storage_stats={},
                              system_health={})
 
-@app.route('/api/system/health')
-def api_system_health():
-    """API endpoint for system health check"""
+@app.route('/health')
+def health():
+    """Simple health check endpoint"""
     try:
-        from whatsapp_integration import is_whatsapp_connected
-        from message_queue import get_queue_status
+        from health_check import get_health_status
+        status = get_health_status(detailed=False)
         
-        queue_status = get_queue_status()
-        storage_stats = storage.get_storage_stats()
-        
-        health = {
-            'status': 'healthy',
+        # Retornar status HTTP apropriado
+        if status.get('status') in ['healthy', 'warning']:
+            return jsonify(status), 200
+        else:
+            return jsonify(status), 503
+            
+    except Exception as e:
+        return jsonify({
+            'status': 'error',
             'timestamp': datetime.now().isoformat(),
-            'components': {
-                'whatsapp': {
-                    'status': 'up' if is_whatsapp_connected() else 'down',
-                    'connected': is_whatsapp_connected()
-                },
-                'message_queue': {
-                    'status': 'up' if queue_status.get('processing', False) else 'down',
-                    'queue_size': queue_status.get('queue_size', 0),
-                    'processing': queue_status.get('processing', False)
-                },
-                'storage': {
-                    'status': 'up' if storage_stats.get('connection_status') == 'connected' else 'down',
-                    'connection': storage_stats.get('connection_status', 'unknown')
-                },
-                'scheduler': {
-                    'status': 'up',
-                    'running_jobs': len(scheduler.get_jobs())
-                }
-            }
+            'error': str(e)
+        }), 503
+
+@app.route('/health/detailed')
+@rate_limit_api(limit=10)
+def health_detailed():
+    """Detailed health check endpoint"""
+    try:
+        from health_check import get_health_status
+        status = get_health_status(detailed=True)
+        
+        # Retornar status HTTP apropriado
+        if status.get('overall_status') in ['healthy', 'warning']:
+            return jsonify(status), 200
+        else:
+            return jsonify(status), 503
+            
+    except Exception as e:
+        return jsonify({
+            'overall_status': 'error',
+            'timestamp': datetime.now().isoformat(),
+            'error': str(e)
+        }), 503
+
+@app.route('/api/system/health')
+@rate_limit_api(limit=20)
+def api_system_health():
+    """API endpoint for system health check - LEGACY"""
+    try:
+        # Manter compatibilidade com versão anterior
+        from health_check import get_health_status
+        
+        health_status = get_health_status(detailed=True)
+        
+        # Converter para formato legacy
+        health = {
+            'status': health_status.get('overall_status', 'error'),
+            'timestamp': health_status.get('timestamp'),
+            'components': {}
         }
         
-        # Determine overall health
-        component_statuses = [comp['status'] for comp in health['components'].values()]
-        if 'down' in component_statuses:
-            health['status'] = 'degraded' if 'up' in component_statuses else 'down'
+        checks = health_status.get('checks', {})
+        
+        # Mapear checks para componentes legacy
+        if 'whatsapp_connection' in checks:
+            whatsapp = checks['whatsapp_connection']
+            health['components']['whatsapp'] = {
+                'status': 'up' if whatsapp.get('status') in ['healthy', 'warning'] else 'down',
+                'connected': whatsapp.get('connected', False)
+            }
+        
+        if 'message_queue' in checks:
+            queue = checks['message_queue']
+            health['components']['message_queue'] = {
+                'status': 'up' if queue.get('status') in ['healthy', 'warning'] else 'down',
+                'queue_size': queue.get('queue_size', 0),
+                'processing': queue.get('processing', False)
+            }
+        
+        if 'github_storage' in checks:
+            storage_check = checks['github_storage']
+            health['components']['storage'] = {
+                'status': 'up' if storage_check.get('status') in ['healthy', 'warning'] else 'down',
+                'connection': storage_check.get('connection_status', 'unknown')
+            }
+        
+        health['components']['scheduler'] = {
+            'status': 'up',
+            'running_jobs': len(scheduler.get_jobs())
+        }
         
         return jsonify(health)
         
