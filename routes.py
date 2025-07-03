@@ -6,67 +6,97 @@ from github_storage import storage
 from models import Client, MessageTemplate
 from reminder_scheduler import setup_reminders, get_upcoming_reminders
 from whatsapp_integration import get_whatsapp_qr_code, is_whatsapp_connected, connect_whatsapp, disconnect_whatsapp
+
+# Importar melhorias implementadas
+from validators import ClientValidator, MessageTemplateValidator, ValidationError
+from rate_limiter import rate_limit_form, rate_limit_api, rate_limit_sensitive, get_client_ip
+from logger_config import log_user_action, log_with_context, app_logger, client_logger
+from simple_cache import cache_dashboard_stats, cache_client_list, app_cache, invalidate_cache_pattern
+from backup_utils import create_backup, auto_backup_before_changes
 import logging
 
 logger = logging.getLogger(__name__)
 
 @app.route('/')
+@cache_dashboard_stats(ttl=120)  # Cache por 2 minutos
 def dashboard():
     """Dashboard with statistics and upcoming reminders"""
-    try:
-        clients = storage.get_clients()
-        
-        # Calculate statistics
-        total_value = sum(client.value for client in clients)
-        iptv_clients = [c for c in clients if c.plan_type == 'IPTV']
-        vpn_clients = [c for c in clients if c.plan_type == 'VPN']
-        
-        iptv_value = sum(client.value for client in iptv_clients)
-        vpn_value = sum(client.value for client in vpn_clients)
-        iptv_count = len(iptv_clients)
-        vpn_count = len(vpn_clients)
-        
-        # Status statistics
-        active_clients = [c for c in clients if c.status == 'ativo']
-        expiring_clients = [c for c in clients if c.status == 'vencendo']
-        expired_clients = [c for c in clients if c.status == 'expirado']
-        
-        # Active revenue (only from active clients)
-        active_revenue = sum(client.value for client in active_clients)
-        
-        # Category breakdown for active clients
-        active_iptv = [c for c in active_clients if c.plan_type == 'IPTV']
-        active_vpn = [c for c in active_clients if c.plan_type == 'VPN']
-        
-        active_iptv_revenue = sum(c.value for c in active_iptv)
-        active_vpn_revenue = sum(c.value for c in active_vpn)
-        
-        # Get upcoming reminders
-        upcoming_reminders = get_upcoming_reminders()
-        
-        return render_template('dashboard.html', 
-                             total_value=total_value,
-                             iptv_value=iptv_value,
-                             vpn_value=vpn_value,
-                             iptv_count=iptv_count,
-                             vpn_count=vpn_count,
-                             total_clients=len(clients),
-                             active_clients=len(active_clients),
-                             expiring_clients=len(expiring_clients),
-                             expired_clients=len(expired_clients),
-                             active_revenue=active_revenue,
-                             active_iptv_count=len(active_iptv),
-                             active_vpn_count=len(active_vpn),
-                             active_iptv_revenue=active_iptv_revenue,
-                             active_vpn_revenue=active_vpn_revenue,
-                             upcoming_reminders=upcoming_reminders)
-    except Exception as e:
-        logger.error(f"Error loading dashboard: {str(e)}")
-        flash('Erro ao carregar dashboard', 'error')
-        return render_template('dashboard.html', 
-                             total_value=0, iptv_value=0, vpn_value=0,
-                             iptv_count=0, vpn_count=0, total_clients=0,
-                             upcoming_reminders=[])
+    client_ip = get_client_ip()
+    
+    with log_with_context(user_ip=client_ip, action="dashboard_view"):
+        try:
+            # Tentar usar cache primeiro
+            cached_stats = app_cache.get('dashboard_stats')
+            
+            if cached_stats is None:
+                clients = storage.get_clients()
+                
+                # Calculate statistics
+                total_value = sum(client.value for client in clients)
+                iptv_clients = [c for c in clients if c.plan_type == 'IPTV']
+                vpn_clients = [c for c in clients if c.plan_type == 'VPN']
+                
+                iptv_value = sum(client.value for client in iptv_clients)
+                vpn_value = sum(client.value for client in vpn_clients)
+                iptv_count = len(iptv_clients)
+                vpn_count = len(vpn_clients)
+                
+                # Status statistics
+                active_clients = [c for c in clients if c.status == 'ativo']
+                expiring_clients = [c for c in clients if c.status == 'vencendo']
+                expired_clients = [c for c in clients if c.status == 'expirado']
+                
+                # Active revenue (only from active clients)
+                active_revenue = sum(client.value for client in active_clients)
+                
+                # Category breakdown for active clients
+                active_iptv = [c for c in active_clients if c.plan_type == 'IPTV']
+                active_vpn = [c for c in active_clients if c.plan_type == 'VPN']
+                
+                active_iptv_revenue = sum(c.value for c in active_iptv)
+                active_vpn_revenue = sum(c.value for c in active_vpn)
+                
+                cached_stats = {
+                    'total_value': total_value,
+                    'iptv_value': iptv_value,
+                    'vpn_value': vpn_value,
+                    'iptv_count': iptv_count,
+                    'vpn_count': vpn_count,
+                    'total_clients': len(clients),
+                    'active_clients': len(active_clients),
+                    'expiring_clients': len(expiring_clients),
+                    'expired_clients': len(expired_clients),
+                    'active_revenue': active_revenue,
+                    'active_iptv_count': len(active_iptv),
+                    'active_vpn_count': len(active_vpn),
+                    'active_iptv_revenue': active_iptv_revenue,
+                    'active_vpn_revenue': active_vpn_revenue
+                }
+                
+                # Cachear estatísticas por 2 minutos
+                app_cache.set('dashboard_stats', cached_stats, ttl=120)
+                
+                app_logger.log_action("dashboard_stats_calculated", 
+                                    total_clients=len(clients),
+                                    user_ip=client_ip)
+            
+            # Get upcoming reminders (não cachear pois muda frequentemente)
+            upcoming_reminders = get_upcoming_reminders()
+            
+            return render_template('dashboard.html', 
+                                 upcoming_reminders=upcoming_reminders,
+                                 **cached_stats)
+                                 
+        except Exception as e:
+            app_logger.log_error(e, context="dashboard_load", user_ip=client_ip)
+            flash('Erro ao carregar dashboard', 'error')
+            return render_template('dashboard.html', 
+                                 total_value=0, iptv_value=0, vpn_value=0,
+                                 iptv_count=0, vpn_count=0, total_clients=0,
+                                 active_clients=0, expiring_clients=0, expired_clients=0,
+                                 active_revenue=0, active_iptv_count=0, active_vpn_count=0,
+                                 active_iptv_revenue=0, active_vpn_revenue=0,
+                                 upcoming_reminders=[])
 
 @app.route('/clients')
 def clients():
@@ -80,36 +110,60 @@ def clients():
         return render_template('clients.html', clients=[])
 
 @app.route('/clients/add', methods=['GET', 'POST'])
+@rate_limit_form(limit=10)  # Máximo 10 adições por minuto
+@auto_backup_before_changes(data_type='clients')
 def add_client():
     """Add new client"""
+    client_ip = get_client_ip()
+    
     if request.method == 'POST':
-        try:
-            # Validate and create client
-            client = Client(
-                id=str(uuid.uuid4()),
-                name=request.form['name'],
-                phone=request.form['phone'],
-                plan_type=request.form['plan_type'],
-                value=float(request.form['value']),
-                plan_duration=request.form['plan_duration'],
-                reminder_time_3days=request.form.get('reminder_time_3days', '09:00'),
-                reminder_time_payment=request.form.get('reminder_time_payment', '10:00'),
-                custom_message_3days=request.form.get('custom_message_3days', ''),
-                custom_message_payment=request.form.get('custom_message_payment', '')
-            )
-            
-            # Save to GitHub
-            if storage.add_client(client):
-                # Update scheduler
-                setup_reminders(scheduler)
-                flash('Cliente adicionado com sucesso!', 'success')
-                return redirect(url_for('clients'))
-            else:
-                flash('Erro ao salvar cliente no GitHub', 'error')
+        with log_with_context(user_ip=client_ip, action="client_add_attempt"):
+            try:
+                # Validar dados antes de criar cliente
+                validated_data = ClientValidator.validate_client_data(request.form)
                 
-        except Exception as e:
-            logger.error(f"Error adding client: {str(e)}")
-            flash(f'Erro ao adicionar cliente: {str(e)}', 'error')
+                client = Client(
+                    id=str(uuid.uuid4()),
+                    **validated_data
+                )
+                
+                # Save to GitHub
+                if storage.add_client(client):
+                    # Limpar cache relacionado
+                    invalidate_cache_pattern("dashboard_stats")
+                    invalidate_cache_pattern("client_list")
+                    
+                    # Update scheduler
+                    setup_reminders(scheduler)
+                    
+                    # Log da ação bem-sucedida
+                    client_logger.log_client_action(
+                        "client_added", 
+                        client.id, 
+                        client.name,
+                        user_ip=client_ip,
+                        phone=client.phone,
+                        plan_type=client.plan_type,
+                        value=client.value
+                    )
+                    
+                    flash('Cliente adicionado com sucesso!', 'success')
+                    return redirect(url_for('clients'))
+                else:
+                    log_user_action("CLIENT_ADD_FAILED", 
+                                  f"GitHub error for {validated_data.get('name', 'unknown')}", 
+                                  client_ip)
+                    flash('Erro ao salvar cliente no GitHub', 'error')
+                    
+            except ValueError as e:
+                # Erros de validação
+                log_user_action("CLIENT_ADD_VALIDATION_ERROR", str(e), client_ip)
+                flash(f'Erro de validação: {str(e)}', 'error')
+                
+            except Exception as e:
+                # Outros erros
+                app_logger.log_error(e, context="client_add", user_ip=client_ip)
+                flash(f'Erro ao adicionar cliente: {str(e)}', 'error')
     
     return render_template('add_client.html')
 
@@ -151,56 +205,113 @@ def edit_client(client_id):
         return redirect(url_for('clients'))
 
 @app.route('/clients/delete/<client_id>', methods=['POST'])
+@rate_limit_sensitive(limit=5)  # Máximo 5 exclusões por minuto (ação sensível)
+@auto_backup_before_changes(data_type='clients')
 def delete_client(client_id):
     """Delete client"""
-    try:
-        if storage.delete_client(client_id):
-            # Update scheduler
-            setup_reminders(scheduler)
-            flash('Cliente excluído com sucesso!', 'success')
-        else:
-            flash('Erro ao excluir cliente', 'error')
-    except Exception as e:
-        logger.error(f"Error deleting client: {str(e)}")
-        flash(f'Erro ao excluir cliente: {str(e)}', 'error')
+    client_ip = get_client_ip()
+    
+    with log_with_context(user_ip=client_ip, action="client_delete", client_id=client_id):
+        try:
+            # Buscar cliente antes de excluir para log
+            client = storage.get_client_by_id(client_id)
+            client_name = client.name if client else "Unknown"
+            
+            if storage.delete_client(client_id):
+                # Limpar cache relacionado
+                invalidate_cache_pattern("dashboard_stats")
+                invalidate_cache_pattern("client_list")
+                
+                # Update scheduler
+                setup_reminders(scheduler)
+                
+                # Log da exclusão
+                client_logger.log_client_action(
+                    "client_deleted",
+                    client_id,
+                    client_name,
+                    user_ip=client_ip
+                )
+                
+                flash('Cliente excluído com sucesso!', 'success')
+            else:
+                log_user_action("CLIENT_DELETE_FAILED", 
+                              f"Failed to delete client {client_id}", client_ip)
+                flash('Erro ao excluir cliente', 'error')
+                
+        except Exception as e:
+            app_logger.log_error(e, context="client_delete", 
+                               user_ip=client_ip, client_id=client_id)
+            flash(f'Erro ao excluir cliente: {str(e)}', 'error')
     
     return redirect(url_for('clients'))
 
 @app.route('/clients/renew/<client_id>', methods=['POST'])
+@rate_limit_form(limit=20)  # Máximo 20 renovações por minuto
+@auto_backup_before_changes(data_type='clients')
 def renew_client(client_id):
     """Renew client plan"""
-    try:
-        client = storage.get_client_by_id(client_id)
-        if not client:
-            flash('Cliente não encontrado', 'error')
-            return redirect(url_for('clients'))
-        
-        renewal_days = int(request.form.get('renewal_days', 30))
-        mark_as_paid = request.form.get('mark_as_paid') == 'on'
-        
-        # Renew the plan
-        if client.renew_plan(renewal_days):
-            if mark_as_paid:
-                client.mark_as_paid()
-            else:
-                client.mark_as_pending()
+    client_ip = get_client_ip()
+    
+    with log_with_context(user_ip=client_ip, action="client_renewal", client_id=client_id):
+        try:
+            client = storage.get_client_by_id(client_id)
+            if not client:
+                log_user_action("CLIENT_RENEWAL_FAILED", f"Client {client_id} not found", client_ip)
+                flash('Cliente não encontrado', 'error')
+                return redirect(url_for('clients'))
             
-            # Save to GitHub
-            if storage.update_client(client):
-                # Update scheduler
-                setup_reminders(scheduler)
-                payment_status = "e marcado como pago" if mark_as_paid else ""
-                flash(f'Plano renovado por {renewal_days} dias {payment_status}!', 'success')
-            else:
-                flash('Erro ao salvar renovação no GitHub', 'error')
-        else:
-            flash('Erro ao renovar plano', 'error')
+            # Validar dados de renovação
+            validated_data = ClientValidator.validate_renewal_data(request.form)
+            renewal_days = validated_data['renewal_days']
+            mark_as_paid = validated_data['mark_as_paid']
             
-    except ValueError:
-        flash('Número de dias inválido', 'error')
-    except Exception as e:
-        logger.error(f"Error renewing client: {str(e)}")
-        flash(f'Erro ao renovar cliente: {str(e)}', 'error')
+            # Renew the plan
+            if client.renew_plan(renewal_days):
+                if mark_as_paid:
+                    client.mark_as_paid()
+                else:
+                    client.mark_as_pending()
+                
+                # Save to GitHub
+                if storage.update_client(client):
+                    # Limpar cache relacionado
+                    invalidate_cache_pattern("dashboard_stats")
+                    invalidate_cache_pattern("client_list")
+                    
+                    # Update scheduler
+                    setup_reminders(scheduler)
+                    
+                    # Log da renovação
+                    client_logger.log_client_action(
+                        "client_renewed",
+                        client.id,
+                        client.name,
+                        user_ip=client_ip,
+                        renewal_days=renewal_days,
+                        marked_as_paid=mark_as_paid,
+                        new_expiration=client.plan_duration
+                    )
+                    
+                    payment_status = "e marcado como pago" if mark_as_paid else ""
+                    flash(f'Plano renovado por {renewal_days} dias {payment_status}!', 'success')
+                else:
+                    log_user_action("CLIENT_RENEWAL_GITHUB_ERROR", 
+                                  f"Failed to save renewal for {client.name}", client_ip)
+                    flash('Erro ao salvar renovação no GitHub', 'error')
+            else:
+                log_user_action("CLIENT_RENEWAL_PLAN_ERROR", 
+                              f"Plan renewal failed for {client.name}", client_ip)
+                flash('Erro ao renovar plano', 'error')
+                
+        except ValueError as e:
+            log_user_action("CLIENT_RENEWAL_VALIDATION_ERROR", str(e), client_ip, client_id)
+            flash(f'Erro de validação: {str(e)}', 'error')
+            
+        except Exception as e:
+            app_logger.log_error(e, context="client_renewal", 
+                               user_ip=client_ip, client_id=client_id)
+            flash(f'Erro ao renovar cliente: {str(e)}', 'error')
     
     return redirect(url_for('clients'))
 
@@ -495,7 +606,146 @@ def api_force_send_reminder():
         logger.error(f"Error force sending reminder: {str(e)}")
         return jsonify({'error': str(e)}), 500
 
+@app.route('/api/cache/stats')
+@rate_limit_api(limit=30)
+def api_cache_stats():
+    """API endpoint for cache statistics"""
+    try:
+        from simple_cache import cache_manager, get_cache_health
+        
+        health = get_cache_health()
+        return jsonify(health)
+        
+    except Exception as e:
+        logger.error(f"Error getting cache stats: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/cache/clear', methods=['POST'])
+@rate_limit_sensitive(limit=3)
+def api_clear_cache():
+    """API endpoint to clear cache"""
+    try:
+        from simple_cache import cache_manager
+        client_ip = get_client_ip()
+        
+        cache_manager.clear_all()
+        
+        log_user_action("CACHE_CLEARED", "All caches cleared", client_ip)
+        
+        return jsonify({
+            'success': True,
+            'message': 'All caches cleared successfully'
+        })
+        
+    except Exception as e:
+        logger.error(f"Error clearing cache: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/backup/create', methods=['POST'])
+@rate_limit_sensitive(limit=2)
+def api_create_backup():
+    """API endpoint to create manual backup"""
+    try:
+        from backup_utils import backup_manager
+        client_ip = get_client_ip()
+        
+        backup_type = request.json.get('type', 'system')
+        
+        if backup_type == 'system':
+            result = backup_manager.create_system_backup()
+        elif backup_type == 'clients':
+            clients = storage.get_clients()
+            result = backup_manager.create_client_backup(clients)
+        elif backup_type == 'templates':
+            templates = storage.get_message_templates()
+            result = backup_manager.create_template_backup(templates)
+        else:
+            return jsonify({'error': 'Invalid backup type'}), 400
+        
+        if result:
+            log_user_action("BACKUP_CREATED", f"Manual {backup_type} backup created", client_ip)
+            return jsonify({
+                'success': True,
+                'message': f'{backup_type.title()} backup created successfully',
+                'backup_file': result
+            })
+        else:
+            return jsonify({'error': 'Failed to create backup'}), 500
+            
+    except Exception as e:
+        logger.error(f"Error creating backup: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/backup/list')
+@rate_limit_api(limit=20)
+def api_list_backups():
+    """API endpoint to list available backups"""
+    try:
+        from backup_utils import backup_manager
+        
+        backup_type = request.args.get('type')
+        backups = backup_manager.list_backups(backup_type)
+        
+        return jsonify({
+            'backups': backups,
+            'count': len(backups)
+        })
+        
+    except Exception as e:
+        logger.error(f"Error listing backups: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/rate-limit/stats')
+@rate_limit_api(limit=30)
+def api_rate_limit_stats():
+    """API endpoint for rate limiting statistics"""
+    try:
+        from rate_limiter import get_rate_limit_stats
+        
+        stats = get_rate_limit_stats()
+        return jsonify(stats)
+        
+    except Exception as e:
+        logger.error(f"Error getting rate limit stats: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/validation/test', methods=['POST'])
+@rate_limit_api(limit=10)
+def api_test_validation():
+    """API endpoint to test validation without saving"""
+    try:
+        data_type = request.json.get('type', 'client')
+        data = request.json.get('data', {})
+        
+        if data_type == 'client':
+            validated = ClientValidator.validate_client_data(data)
+            return jsonify({
+                'valid': True,
+                'validated_data': validated,
+                'message': 'Dados válidos'
+            })
+        elif data_type == 'template':
+            validated = MessageTemplateValidator.validate_template_data(data)
+            return jsonify({
+                'valid': True,
+                'validated_data': validated,
+                'message': 'Template válido'
+            })
+        else:
+            return jsonify({'error': 'Invalid data type'}), 400
+            
+    except ValueError as e:
+        return jsonify({
+            'valid': False,
+            'error': str(e),
+            'message': 'Dados inválidos'
+        }), 400
+    except Exception as e:
+        logger.error(f"Error testing validation: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
 @app.route('/api/whatsapp/reconnect', methods=['POST'])
+@rate_limit_api(limit=5)
 def api_whatsapp_reconnect():
     """API endpoint to force WhatsApp reconnection"""
     try:
