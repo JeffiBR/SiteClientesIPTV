@@ -166,6 +166,77 @@ def delete_client(client_id):
     
     return redirect(url_for('clients'))
 
+@app.route('/clients/renew/<client_id>', methods=['POST'])
+def renew_client(client_id):
+    """Renew client plan"""
+    try:
+        client = storage.get_client_by_id(client_id)
+        if not client:
+            flash('Cliente não encontrado', 'error')
+            return redirect(url_for('clients'))
+        
+        renewal_days = int(request.form.get('renewal_days', 30))
+        mark_as_paid = request.form.get('mark_as_paid') == 'on'
+        
+        # Renew the plan
+        if client.renew_plan(renewal_days):
+            if mark_as_paid:
+                client.mark_as_paid()
+            else:
+                client.mark_as_pending()
+            
+            # Save to GitHub
+            if storage.update_client(client):
+                # Update scheduler
+                setup_reminders(scheduler)
+                payment_status = "e marcado como pago" if mark_as_paid else ""
+                flash(f'Plano renovado por {renewal_days} dias {payment_status}!', 'success')
+            else:
+                flash('Erro ao salvar renovação no GitHub', 'error')
+        else:
+            flash('Erro ao renovar plano', 'error')
+            
+    except ValueError:
+        flash('Número de dias inválido', 'error')
+    except Exception as e:
+        logger.error(f"Error renewing client: {str(e)}")
+        flash(f'Erro ao renovar cliente: {str(e)}', 'error')
+    
+    return redirect(url_for('clients'))
+
+@app.route('/clients/payment-status/<client_id>', methods=['POST'])
+def update_payment_status(client_id):
+    """Update client payment status"""
+    try:
+        client = storage.get_client_by_id(client_id)
+        if not client:
+            flash('Cliente não encontrado', 'error')
+            return redirect(url_for('clients'))
+        
+        status = request.form.get('status')
+        if status == 'paid':
+            client.mark_as_paid()
+            flash('Cliente marcado como pago!', 'success')
+        elif status == 'pending':
+            client.mark_as_pending()
+            flash('Status alterado para pendente', 'info')
+        else:
+            flash('Status inválido', 'error')
+            return redirect(url_for('clients'))
+        
+        # Save to GitHub
+        if storage.update_client(client):
+            # Update scheduler
+            setup_reminders(scheduler)
+        else:
+            flash('Erro ao atualizar status no GitHub', 'error')
+            
+    except Exception as e:
+        logger.error(f"Error updating payment status: {str(e)}")
+        flash(f'Erro ao atualizar status: {str(e)}', 'error')
+    
+    return redirect(url_for('clients'))
+
 @app.route('/messages')
 def messages():
     """Manage message templates"""
