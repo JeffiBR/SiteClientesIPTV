@@ -47,9 +47,24 @@ class WhatsAppIntegration:
         }
         self.failed_sends = []
         self.connection_callbacks = []
+        self.heartbeat_thread = None
+        self.monitor_thread = None
+        self.heartbeat_interval = 30  # seconds
+        self.connection_timeout = 300  # 5 minutes without heartbeat = disconnected
+        self.last_heartbeat = None
+        self.auto_reconnect = True
+        self.reconnect_attempts = 0
+        self.max_reconnect_attempts = 5
+        self.webhook_url = None
+        self.message_queue = []
         
         # Load previous connection state
         self._load_connection_state()
+        
+        # Start background services if connected
+        if self.connection_status == WhatsAppConnectionStatus.CONNECTED:
+            self._start_heartbeat()
+            self._start_connection_monitor()
     
     def _load_connection_state(self) -> bool:
         """Load connection status from storage with error handling"""
@@ -112,29 +127,35 @@ class WhatsAppIntegration:
                 logger.info("Already connected to WhatsApp")
                 return self.qr_code
             
+            if not QRCODE_AVAILABLE:
+                logger.error("QR code generation not available - qrcode module not installed")
+                self.connection_error = "QR code module not available"
+                return None
+            
             # Generate unique session ID for QR code
             self.session_id = str(uuid.uuid4())
             timestamp = datetime.now().isoformat()
             
-            # QR code data should contain session info for real WhatsApp integration
-            qr_data = f"whatsapp://connect?session={self.session_id}&timestamp={timestamp}&app=client-manager&v=2.0"
+            # Real WhatsApp Web connection data
+            # This should integrate with WhatsApp Business API or similar service
+            qr_data = f"whatsapp://connect?session={self.session_id}&timestamp={timestamp}&app=client-manager&v=3.0"
             
             try:
                 qr = qrcode.QRCode(
                     version=1,
-                    error_correction=qrcode.ERROR_CORRECT_L,
-                    box_size=10,
+                    error_correction=qrcode.ERROR_CORRECT_M,
+                    box_size=12,
                     border=4,
                 )
                 qr.add_data(qr_data)
                 qr.make(fit=True)
                 
-                # Create QR code image
+                # Create QR code image with better quality
                 img = qr.make_image(fill_color="black", back_color="white")
                 
                 # Convert to base64 for web display
                 img_buffer = io.BytesIO()
-                img.save(img_buffer, format='PNG')
+                img.save(img_buffer, format='PNG', optimize=True)
                 img_buffer.seek(0)
                 
                 img_base64 = base64.b64encode(img_buffer.getvalue()).decode()
@@ -145,7 +166,11 @@ class WhatsAppIntegration:
                 self.connection_error = None
                 self._save_connection_state()
                 
+                # Start connection monitoring
+                self._start_connection_monitor()
+                
                 logger.info(f"QR code generated for session: {self.session_id}")
+                logger.info("Scan the QR code with WhatsApp to connect")
                 return self.qr_code
                 
             except Exception as qr_error:
@@ -443,24 +468,170 @@ class WhatsAppIntegration:
         self._save_connection_state()
         logger.info(f"Message sending {'enabled' if enabled else 'disabled'}")
     
+    def _start_connection_monitor(self):
+        """Start the connection monitoring thread"""
+        if self.monitor_thread and self.monitor_thread.is_alive():
+            return
+        
+        self.monitor_thread = threading.Thread(target=self._connection_monitor_loop, daemon=True)
+        self.monitor_thread.start()
+        logger.info("Connection monitor started")
+    
+    def _connection_monitor_loop(self):
+        """Monitor connection status and handle reconnection"""
+        while True:
+            try:
+                time.sleep(60)  # Check every minute
+                
+                if self.connection_status == WhatsAppConnectionStatus.CONNECTED:
+                    # Check if heartbeat is recent
+                    if self.last_heartbeat:
+                        time_since_heartbeat = (datetime.now() - self.last_heartbeat).total_seconds()
+                        
+                        if time_since_heartbeat > self.connection_timeout:
+                            logger.warning(f"No heartbeat for {time_since_heartbeat}s, marking as disconnected")
+                            self.connection_status = WhatsAppConnectionStatus.DISCONNECTED
+                            self._save_connection_state()
+                            
+                            if self.auto_reconnect:
+                                self._attempt_reconnect()
+                    
+                    # Process message queue
+                    self._process_message_queue()
+                
+                elif self.connection_status == WhatsAppConnectionStatus.DISCONNECTED and self.auto_reconnect:
+                    self._attempt_reconnect()
+                    
+            except Exception as e:
+                logger.error(f"Error in connection monitor: {str(e)}")
+                time.sleep(30)  # Wait before retrying
+    
+    def _start_heartbeat(self):
+        """Start the heartbeat thread"""
+        if self.heartbeat_thread and self.heartbeat_thread.is_alive():
+            return
+        
+        self.heartbeat_thread = threading.Thread(target=self._heartbeat_loop, daemon=True)
+        self.heartbeat_thread.start()
+        logger.info("Heartbeat started")
+    
+    def _heartbeat_loop(self):
+        """Send heartbeat to maintain connection"""
+        while self.connection_status == WhatsAppConnectionStatus.CONNECTED:
+            try:
+                # Send heartbeat (in real implementation, this would ping WhatsApp)
+                success = self._send_heartbeat()
+                
+                if success:
+                    self.last_heartbeat = datetime.now()
+                else:
+                    logger.warning("Heartbeat failed")
+                
+                time.sleep(self.heartbeat_interval)
+                
+            except Exception as e:
+                logger.error(f"Error in heartbeat: {str(e)}")
+                time.sleep(self.heartbeat_interval)
+    
+    def _send_heartbeat(self) -> bool:
+        """Send heartbeat ping to WhatsApp"""
+        try:
+            # In a real implementation, this would send a ping to WhatsApp API
+            # For now, we'll simulate it
+            logger.debug("Sending heartbeat to WhatsApp")
+            
+            # Simulate occasional heartbeat failures (5% chance)
+            import random
+            if random.random() < 0.05:
+                return False
+            
+            return True
+            
+        except Exception as e:
+            logger.error(f"Heartbeat error: {str(e)}")
+            return False
+    
+    def _attempt_reconnect(self):
+        """Attempt to reconnect to WhatsApp"""
+        try:
+            if self.reconnect_attempts >= self.max_reconnect_attempts:
+                logger.error("Max reconnect attempts reached")
+                self.connection_status = WhatsAppConnectionStatus.ERROR
+                self.connection_error = "Max reconnect attempts exceeded"
+                self._save_connection_state()
+                return
+            
+            self.reconnect_attempts += 1
+            logger.info(f"Attempting reconnection #{self.reconnect_attempts}")
+            
+            self.connection_status = WhatsAppConnectionStatus.RECONNECTING
+            self._save_connection_state()
+            
+            # Wait before attempting reconnection
+            wait_time = min(300, 30 * self.reconnect_attempts)  # Max 5 minutes
+            logger.info(f"Waiting {wait_time}s before reconnect attempt")
+            time.sleep(wait_time)
+            
+            # Generate new QR code for reconnection
+            self.qr_code = None
+            self.session_id = None
+            
+            qr_code = self.generate_qr_code()
+            if qr_code:
+                logger.info("New QR code generated for reconnection")
+                # In real implementation, you'd need to scan this new QR code
+            else:
+                logger.error("Failed to generate QR code for reconnection")
+                
+        except Exception as e:
+            logger.error(f"Error during reconnection attempt: {str(e)}")
+            self.connection_status = WhatsAppConnectionStatus.ERROR
+            self.connection_error = str(e)
+            self._save_connection_state()
+    
+    def _process_message_queue(self):
+        """Process queued messages"""
+        if not self.message_queue:
+            return
+        
+        processed = 0
+        failed = 0
+        
+        for message in self.message_queue.copy():
+            try:
+                success = self._send_message_internal(message['phone'], message['message'])
+                
+                if success:
+                    self.message_queue.remove(message)
+                    processed += 1
+                    logger.info(f"Queued message sent to {message['phone']}")
+                else:
+                    failed += 1
+                    # Keep in queue for retry
+                    
+            except Exception as e:
+                logger.error(f"Error processing queued message: {str(e)}")
+                failed += 1
+        
+        if processed > 0 or failed > 0:
+            logger.info(f"Message queue processed: {processed} sent, {failed} failed, {len(self.message_queue)} remaining")
+    
+    def queue_message(self, phone: str, message: str):
+        """Add message to queue for later sending"""
+        self.message_queue.append({
+            'phone': phone,
+            'message': message,
+            'queued_at': datetime.now().isoformat(),
+            'attempts': 0
+        })
+        logger.info(f"Message queued for {phone}")
+    
     def force_reconnect(self):
         """Force a reconnection attempt"""
         try:
             logger.info("Forcing WhatsApp reconnection...")
-            self.connection_status = WhatsAppConnectionStatus.RECONNECTING
-            self.connection_attempts += 1
-            self._save_connection_state()
-            
-            # Generate new QR code
-            self.qr_code = None
-            self.session_id = None
-            
-            if self.connection_attempts >= self.max_connection_attempts:
-                logger.error("Max connection attempts reached, giving up")
-                self.connection_status = WhatsAppConnectionStatus.ERROR
-                self.connection_error = "Max connection attempts exceeded"
-            else:
-                self.generate_qr_code()
+            self.reconnect_attempts = 0  # Reset attempts
+            self._attempt_reconnect()
                 
         except Exception as e:
             logger.error(f"Error during force reconnect: {str(e)}")
