@@ -17,9 +17,10 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-@app.route('/')
-@cache_dashboard_stats(ttl=120)  # Cache por 2 minutos
-def dashboard():
+# Temporarily comment out to isolate wrapper conflict
+# @app.route('/')
+# @cache_dashboard_stats(ttl=120)  # Cache por 2 minutos
+# def dashboard():
     """Dashboard with statistics and upcoming reminders"""
     client_ip = get_client_ip()
     
@@ -109,10 +110,11 @@ def clients():
         flash('Erro ao carregar clientes', 'error')
         return render_template('clients.html', clients=[])
 
-@app.route('/clients/add', methods=['GET', 'POST'])
-@rate_limit_form(limit=10)  # Máximo 10 adições por minuto
-@auto_backup_before_changes(data_type='clients')
-def add_client():
+# Temporarily comment out to isolate wrapper conflict
+# @app.route('/clients/add', methods=['GET', 'POST'])
+# @rate_limit_form(limit=10)  # Máximo 10 adições por minuto
+# @auto_backup_before_changes(data_type='clients')
+# def add_client():
     """Add new client"""
     client_ip = get_client_ip()
     
@@ -204,10 +206,11 @@ def edit_client(client_id):
         flash(f'Erro ao editar cliente: {str(e)}', 'error')
         return redirect(url_for('clients'))
 
-@app.route('/clients/delete/<client_id>', methods=['POST'])
-@rate_limit_sensitive(limit=5)  # Máximo 5 exclusões por minuto (ação sensível)
-@auto_backup_before_changes(data_type='clients')
-def delete_client(client_id):
+# Temporarily comment out to isolate wrapper conflict
+# @app.route('/clients/delete/<client_id>', methods=['POST'])
+# @rate_limit_sensitive(limit=5)  # Máximo 5 exclusões por minuto (ação sensível)
+# @auto_backup_before_changes(data_type='clients')
+# def delete_client(client_id):
     """Delete client"""
     client_ip = get_client_ip()
     
@@ -246,10 +249,11 @@ def delete_client(client_id):
     
     return redirect(url_for('clients'))
 
-@app.route('/clients/renew/<client_id>', methods=['POST'])
-@rate_limit_form(limit=20)  # Máximo 20 renovações por minuto
-@auto_backup_before_changes(data_type='clients')
-def renew_client(client_id):
+# Temporarily comment out to isolate wrapper conflict
+# @app.route('/clients/renew/<client_id>', methods=['POST'])
+# @rate_limit_form(limit=20)  # Máximo 20 renovações por minuto
+# @auto_backup_before_changes(data_type='clients')
+# def renew_client(client_id):
     """Renew client plan"""
     client_ip = get_client_ip()
     
@@ -516,9 +520,10 @@ def health():
             'error': str(e)
         }), 503
 
-@app.route('/health/detailed')
-@rate_limit_api(limit=10)
-def health_detailed():
+# Temporarily comment out to isolate wrapper conflict
+# @app.route('/health/detailed')
+# @rate_limit_api(limit=10)
+# def health_detailed():
     """Detailed health check endpoint"""
     try:
         from health_check import get_health_status
@@ -537,9 +542,10 @@ def health_detailed():
             'error': str(e)
         }), 503
 
-@app.route('/api/system/health')
-@rate_limit_api(limit=20)
-def api_system_health():
+# Temporarily comment out to isolate wrapper conflict
+# @app.route('/api/system/health')
+# @rate_limit_api(limit=20)
+# def api_system_health():
     """API endpoint for system health check - LEGACY"""
     try:
         # Manter compatibilidade com versão anterior
@@ -655,9 +661,10 @@ def api_force_send_reminder():
         logger.error(f"Error force sending reminder: {str(e)}")
         return jsonify({'error': str(e)}), 500
 
-@app.route('/api/cache/stats')
-@rate_limit_api(limit=30)
-def api_cache_stats():
+# Temporarily comment out to isolate wrapper conflict
+# @app.route('/api/cache/stats')
+# @rate_limit_api(limit=30)
+# def api_cache_stats():
     """API endpoint for cache statistics"""
     try:
         from simple_cache import cache_manager, get_cache_health
