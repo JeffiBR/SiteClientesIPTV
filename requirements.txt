@@ -10,18 +10,18 @@ itsdangerous==2.1.2
 click==8.1.7
 blinker==1.6.3
 
-# Melhorias implementadas - dependências opcionais
-# Se não tiver psutil, funciona sem monitoramento de sistema
+# WhatsApp integration
+qrcode[pil]==8.2
+
+# System monitoring (optional)
 psutil>=5.9.0
 
-# Para logs estruturados (opcional)
+# Development tools (optional)
+python-dotenv>=1.0.0
+
+# Future enhancements (commented out)
 # structlog>=23.1.0
-
-# Para cache distribuído futuro (opcional)
 # redis>=4.5.0
-
-# Para validação avançada futuro (opcional)
 # marshmallow>=3.19.0
-
-# Para sanitização de dados futuro (opcional)
 # bleach>=6.0.0
+# SQLAlchemy>=2.0.0

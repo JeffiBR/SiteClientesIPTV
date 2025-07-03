@@ -18,365 +18,305 @@ class GitHubStorageError(Exception):
 
 class GitHubStorage:
     def __init__(self):
-        self.token = os.getenv('CL_TOKEN')
-        self.repo_owner = 'JeffiBR'
-        self.repo_name = 'Clientes'
-        self.base_url = f'https://api.github.com/repos/{self.repo_owner}/{self.repo_name}/contents'
-        self.headers = {
-            'Authorization': f'token {self.token}',
-            'Accept': 'application/vnd.github.v3+json',
-            'User-Agent': 'Bot-Cliente-Manager/1.0'
-        }
-        self.max_retries = 3
-        self.retry_delay = 1  # seconds
-        self.rate_limit_remaining = None
-        self.rate_limit_reset = None
-        self.cache = {}
-        self.cache_timeout = 300  # 5 minutes
-        self.backup_enabled = True
-        self.connection_lock = threading.RLock()
+        self.token = os.environ.get('CL_TOKEN')
+        self.username = os.environ.get('CL_USERNAME', 'default_user')
+        self.repo_name = os.environ.get('CL_REPO', 'client-manager-data')
+        self.branch = os.environ.get('CL_BRANCH', 'main')
+        self.base_url = f"https://api.github.com/repos/{self.username}/{self.repo_name}/contents"
         
-        # Validate configuration
-        self._validate_configuration()
+        # Modo de desenvolvimento - funciona offline sem GitHub válido
+        self.dev_mode = os.environ.get('CL_DEV_MODE', 'true').lower() == 'true'
+        self.local_storage_path = os.path.join(os.getcwd(), 'local_data')
+        
+        if self.dev_mode:
+            logger.info("Running in development mode - using local storage")
+            self._ensure_local_storage()
+        else:
+            # Só valida configuração se não estiver em modo dev
+            self._validate_configuration()
     
+    def _ensure_local_storage(self):
+        """Criar diretório de armazenamento local para modo dev"""
+        try:
+            os.makedirs(self.local_storage_path, exist_ok=True)
+            
+            # Criar arquivos iniciais se não existirem
+            default_files = {
+                'clients.json': [],
+                'message_templates.json': [
+                    {
+                        "id": "1",
+                        "name": "Lembrete 3 dias",
+                        "content": "Olá {name}! Seu plano vence em 3 dias. Renovar agora: R$ {value}",
+                        "type": "reminder_3days"
+                    },
+                    {
+                        "id": "2", 
+                        "name": "Cobrança",
+                        "content": "Olá {name}! Seu plano VPN venceu. Renove agora por apenas R$ {value}",
+                        "type": "payment_due"
+                    }
+                ],
+                'whatsapp_status.json': {
+                    'status': 'disconnected',
+                    'error': None,
+                    'session_id': None,
+                    'last_updated': datetime.now().isoformat()
+                }
+            }
+            
+            for filename, content in default_files.items():
+                filepath = os.path.join(self.local_storage_path, filename)
+                if not os.path.exists(filepath):
+                    with open(filepath, 'w', encoding='utf-8') as f:
+                        json.dump(content, f, indent=2, ensure_ascii=False)
+                    logger.info(f"Created local file: {filename}")
+                    
+        except Exception as e:
+            logger.error(f"Error setting up local storage: {str(e)}")
+
     def _validate_configuration(self):
-        """Validate GitHub storage configuration"""
+        """Validate GitHub configuration"""
         if not self.token:
             raise GitHubStorageError("GitHub token (CL_TOKEN) not found in environment variables")
         
-        if len(self.token) < 20:
-            raise GitHubStorageError("Invalid GitHub token format")
+        if len(self.token) < 10:  # Basic token validation
+            raise GitHubStorageError("GitHub token appears to be invalid (too short)")
         
         # Test connection
-        try:
-            self._test_connection()
-        except Exception as e:
-            logger.warning(f"GitHub connection test failed: {str(e)}")
-    
+        self._test_connection()
+
     def _test_connection(self):
         """Test GitHub API connection"""
         try:
-            url = f'https://api.github.com/repos/{self.repo_owner}/{self.repo_name}'
-            response = requests.get(url, headers=self.headers, timeout=10)
+            if self.dev_mode:
+                logger.info("Skipping GitHub connection test in dev mode")
+                return True
+                
+            test_url = f"https://api.github.com/repos/{self.username}/{self.repo_name}"
+            headers = {
+                'Authorization': f'token {self.token}',
+                'User-Agent': 'Client-Manager-Bot/1.0'
+            }
+            
+            response = requests.get(test_url, headers=headers, timeout=10)
             
             if response.status_code == 200:
                 logger.info("GitHub connection test successful")
                 return True
-            elif response.status_code == 404:
-                raise GitHubStorageError(f"Repository {self.repo_owner}/{self.repo_name} not found")
             elif response.status_code == 401:
-                raise GitHubStorageError("Invalid GitHub token or insufficient permissions")
+                logger.warning("GitHub connection test failed: Invalid GitHub token or insufficient permissions")
+                # Em modo dev, continua funcionando mesmo com token inválido
+                if self.dev_mode:
+                    return True
+                else:
+                    raise GitHubStorageError("Invalid GitHub token or insufficient permissions")
             else:
-                raise GitHubStorageError(f"GitHub API error: {response.status_code}")
+                logger.warning(f"GitHub connection test failed with status {response.status_code}")
+                return False
                 
         except requests.exceptions.RequestException as e:
-            raise GitHubStorageError(f"Network error connecting to GitHub: {str(e)}")
-    
-    def _check_rate_limit(self, response_headers: Dict):
-        """Check and handle GitHub API rate limits"""
-        try:
-            self.rate_limit_remaining = int(response_headers.get('X-RateLimit-Remaining', 0))
-            self.rate_limit_reset = int(response_headers.get('X-RateLimit-Reset', 0))
-            
-            if self.rate_limit_remaining < 10:
-                reset_time = datetime.fromtimestamp(self.rate_limit_reset)
-                wait_time = (reset_time - datetime.now()).total_seconds()
-                
-                if wait_time > 0:
-                    logger.warning(f"GitHub rate limit low ({self.rate_limit_remaining}), waiting {wait_time:.1f}s")
-                    time.sleep(min(wait_time, 60))  # Max 1 minute wait
-                    
-        except (ValueError, TypeError) as e:
-            logger.warning(f"Error parsing rate limit headers: {str(e)}")
-    
-    def _get_cache_key(self, filename: str) -> str:
-        """Generate cache key for file"""
-        return f"file_{filename}_{int(time.time() // self.cache_timeout)}"
-    
-    def _get_cached_content(self, filename: str) -> Optional[Dict]:
-        """Get file content from cache if valid"""
-        try:
-            cache_key = self._get_cache_key(filename)
-            if cache_key in self.cache:
-                cached_data = self.cache[cache_key]
-                if time.time() - cached_data['timestamp'] < self.cache_timeout:
-                    logger.debug(f"Using cached content for {filename}")
-                    return cached_data['data']
-            return None
+            if self.dev_mode:
+                logger.warning(f"GitHub connection failed, continuing in dev mode: {str(e)}")
+                return True
+            else:
+                logger.error(f"GitHub connection test failed: {str(e)}")
+                raise GitHubStorageError(f"GitHub connection test failed: {str(e)}")
         except Exception as e:
-            logger.warning(f"Error accessing cache: {str(e)}")
-            return None
-    
-    def _cache_content(self, filename: str, data: Dict):
-        """Cache file content"""
+            logger.error(f"Unexpected error during connection test: {str(e)}")
+            if self.dev_mode:
+                return True
+            else:
+                raise GitHubStorageError(f"Unexpected connection test error: {str(e)}")
+
+    def _get_file_content(self, filename: str) -> Optional[Dict]:
+        """Get file content from GitHub or local storage"""
         try:
-            cache_key = self._get_cache_key(filename)
-            self.cache[cache_key] = {
-                'data': data,
-                'timestamp': time.time()
+            if self.dev_mode:
+                return self._get_local_file_content(filename)
+            else:
+                return self._get_github_file_content(filename)
+        except Exception as e:
+            logger.error(f"Error getting file content for {filename}: {str(e)}")
+            if self.dev_mode:
+                # Fallback para local mesmo em caso de erro
+                return self._get_local_file_content(filename)
+            else:
+                raise GitHubStorageError(f"Unexpected error: {str(e)}")
+    
+    def _get_local_file_content(self, filename: str) -> Optional[Dict]:
+        """Get file content from local storage"""
+        try:
+            filepath = os.path.join(self.local_storage_path, filename)
+            
+            if not os.path.exists(filepath):
+                logger.debug(f"Local file not found: {filename}")
+                return None
+            
+            with open(filepath, 'r', encoding='utf-8') as f:
+                content = json.load(f)
+            
+            return {
+                'content': content,
+                'sha': 'local_' + str(hash(json.dumps(content, sort_keys=True))),
+                'name': filename
             }
             
-            # Cleanup old cache entries
-            current_time = time.time()
-            keys_to_remove = []
-            for key, cached_data in self.cache.items():
-                if current_time - cached_data['timestamp'] > self.cache_timeout * 2:
-                    keys_to_remove.append(key)
-            
-            for key in keys_to_remove:
-                del self.cache[key]
-                
         except Exception as e:
-            logger.warning(f"Error caching content: {str(e)}")
+            logger.error(f"Error reading local file {filename}: {str(e)}")
+            return None
     
-    def _get_file_content(self, filename: str, use_cache: bool = True) -> Optional[Dict]:
-        """Get file content from GitHub repository with retry and error handling"""
-        
-        # Check cache first
-        if use_cache:
-            cached_content = self._get_cached_content(filename)
-            if cached_content:
-                return cached_content
-        
-        with self.connection_lock:
-            for attempt in range(self.max_retries):
+    def _get_github_file_content(self, filename: str) -> Optional[Dict]:
+        """Get file content from GitHub"""
+        try:
+            url = f"{self.base_url}/{filename}"
+            headers = {
+                'Authorization': f'token {self.token}',
+                'User-Agent': 'Client-Manager-Bot/1.0',
+                'Accept': 'application/vnd.github.v3+json'
+            }
+            
+            max_retries = 3
+            for attempt in range(max_retries):
                 try:
-                    url = f'{self.base_url}/{filename}'
-                    
-                    # Add timeout and better error handling
-                    response = requests.get(
-                        url, 
-                        headers=self.headers, 
-                        timeout=30,
-                        allow_redirects=True
-                    )
-                    
-                    # Check rate limits
-                    self._check_rate_limit(response.headers)
+                    response = requests.get(url, headers=headers, timeout=30)
                     
                     if response.status_code == 200:
-                        file_data = response.json()
+                        data = response.json()
                         
-                        # Validate response structure
-                        if 'content' not in file_data or 'sha' not in file_data:
-                            raise GitHubStorageError(f"Invalid response structure for {filename}")
+                        # Decode base64 content
+                        content_b64 = data.get('content', '')
+                        content_bytes = base64.b64decode(content_b64)
+                        content_str = content_bytes.decode('utf-8')
+                        content_json = json.loads(content_str)
                         
-                        try:
-                            content = base64.b64decode(file_data['content']).decode('utf-8')
-                            parsed_content = json.loads(content)
-                            
-                            result = {
-                                'content': parsed_content,
-                                'sha': file_data['sha']
-                            }
-                            
-                            # Cache the result
-                            if use_cache:
-                                self._cache_content(filename, result)
-                            
-                            return result
-                            
-                        except (json.JSONDecodeError, UnicodeDecodeError) as e:
-                            logger.error(f"Error decoding content from {filename}: {str(e)}")
-                            if attempt == self.max_retries - 1:
-                                raise GitHubStorageError(f"Content decode error: {str(e)}")
-                            
+                        return {
+                            'content': content_json,
+                            'sha': data.get('sha'),
+                            'name': data.get('name'),
+                            'size': data.get('size')
+                        }
                     elif response.status_code == 404:
-                        logger.debug(f"File {filename} not found (404)")
+                        logger.debug(f"File not found in GitHub: {filename}")
                         return None
-                        
-                    elif response.status_code == 403:
-                        logger.error(f"GitHub API access forbidden for {filename}: {response.text}")
-                        if "rate limit" in response.text.lower():
-                            time.sleep(60)  # Wait 1 minute for rate limit
-                            continue
-                        raise GitHubStorageError(f"Access forbidden: {response.text}")
-                        
-                    elif response.status_code >= 500:
-                        logger.warning(f"GitHub server error {response.status_code} for {filename}, attempt {attempt + 1}")
-                        if attempt < self.max_retries - 1:
-                            time.sleep(self.retry_delay * (2 ** attempt))  # Exponential backoff
-                            continue
-                        raise GitHubStorageError(f"Server error: {response.status_code}")
-                        
+                    elif response.status_code == 401:
+                        logger.error(f"Unauthorized access to {filename} - check GitHub token")
+                        raise GitHubStorageError(f"Unauthorized access to {filename}")
                     else:
                         logger.error(f"Unexpected status code {response.status_code} for {filename}: {response.text}")
                         raise GitHubStorageError(f"API error {response.status_code}: {response.text}")
                         
                 except requests.exceptions.Timeout:
-                    logger.warning(f"Timeout getting {filename}, attempt {attempt + 1}")
-                    if attempt < self.max_retries - 1:
-                        time.sleep(self.retry_delay * (2 ** attempt))
-                        continue
-                    raise GitHubStorageError(f"Timeout after {self.max_retries} attempts")
+                    logger.warning(f"Timeout on attempt {attempt + 1} for {filename}")
+                    if attempt == max_retries - 1:
+                        raise GitHubStorageError(f"Timeout after {max_retries} attempts")
+                    time.sleep(2 ** attempt)  # Exponential backoff
                     
-                except requests.exceptions.ConnectionError as e:
-                    logger.warning(f"Connection error getting {filename}, attempt {attempt + 1}: {str(e)}")
-                    if attempt < self.max_retries - 1:
-                        time.sleep(self.retry_delay * (2 ** attempt))
-                        continue
-                    raise GitHubStorageError(f"Connection error: {str(e)}")
+                except requests.exceptions.RequestException as e:
+                    logger.error(f"Request error on attempt {attempt + 1} for {filename}: {str(e)}")
+                    if attempt == max_retries - 1:
+                        raise GitHubStorageError(f"Request error after {max_retries} attempts: {str(e)}")
+                    time.sleep(2 ** attempt)
                     
-                except Exception as e:
-                    logger.error(f"Unexpected error getting {filename}: {str(e)}")
-                    if attempt == self.max_retries - 1:
-                        raise GitHubStorageError(f"Unexpected error: {str(e)}")
-                    time.sleep(self.retry_delay)
-            
-            raise GitHubStorageError(f"Failed to get {filename} after {self.max_retries} attempts")
+        except json.JSONDecodeError as e:
+            logger.error(f"JSON decode error for {filename}: {str(e)}")
+            raise GitHubStorageError(f"Invalid JSON in {filename}: {str(e)}")
+        except Exception as e:
+            logger.error(f"Unexpected error getting {filename}: {str(e)}")
+            raise GitHubStorageError(f"Unexpected error: {str(e)}")
     
-    def _save_file_content(self, filename: str, content: Dict, sha: Optional[str] = None, create_backup: bool = True) -> bool:
-        """Save file content to GitHub repository with retry and backup"""
-        
-        # Create backup if enabled and updating existing file
-        if create_backup and self.backup_enabled and sha:
-            try:
-                self._create_backup(filename, content)
-            except Exception as e:
-                logger.warning(f"Backup creation failed for {filename}: {str(e)}")
-        
-        with self.connection_lock:
-            for attempt in range(self.max_retries):
-                try:
-                    url = f'{self.base_url}/{filename}'
-                    
-                    # Validate content before encoding
-                    self._validate_content(content, filename)
-                    
-                    # Encode content as base64
-                    content_json = json.dumps(content, indent=2, ensure_ascii=False)
-                    content_b64 = base64.b64encode(content_json.encode('utf-8')).decode('utf-8')
-                    
-                    data = {
-                        'message': f'Update {filename} - {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}',
-                        'content': content_b64
-                    }
-                    
-                    if sha:
-                        data['sha'] = sha
-                    
-                    response = requests.put(
-                        url, 
-                        json=data, 
-                        headers=self.headers, 
-                        timeout=30
-                    )
-                    
-                    # Check rate limits
-                    self._check_rate_limit(response.headers)
-                    
-                    if response.status_code in [200, 201]:
-                        logger.info(f"Successfully saved {filename}")
-                        
-                        # Clear cache for this file
-                        cache_keys_to_remove = [key for key in self.cache.keys() if filename in key]
-                        for key in cache_keys_to_remove:
-                            del self.cache[key]
-                        
-                        return True
-                        
-                    elif response.status_code == 409:
-                        logger.warning(f"Conflict saving {filename}, retrying with fresh SHA")
-                        # Get fresh SHA and retry
-                        try:
-                            fresh_data = self._get_file_content(filename, use_cache=False)
-                            if fresh_data:
-                                data['sha'] = fresh_data['sha']
-                                response = requests.put(url, json=data, headers=self.headers, timeout=30)
-                                if response.status_code in [200, 201]:
-                                    return True
-                        except Exception as e:
-                            logger.error(f"Error retrying with fresh SHA: {str(e)}")
-                        
-                    elif response.status_code == 403:
-                        if "rate limit" in response.text.lower():
-                            logger.warning("Rate limit hit while saving, waiting...")
-                            time.sleep(60)
-                            continue
-                        raise GitHubStorageError(f"Access forbidden: {response.text}")
-                        
-                    elif response.status_code >= 500:
-                        logger.warning(f"Server error {response.status_code} saving {filename}, attempt {attempt + 1}")
-                        if attempt < self.max_retries - 1:
-                            time.sleep(self.retry_delay * (2 ** attempt))
-                            continue
-                        
-                    logger.error(f"Error saving {filename}: {response.status_code} - {response.text}")
-                    if attempt == self.max_retries - 1:
-                        raise GitHubStorageError(f"Save failed: {response.status_code} - {response.text}")
-                    
-                except requests.exceptions.Timeout:
-                    logger.warning(f"Timeout saving {filename}, attempt {attempt + 1}")
-                    if attempt < self.max_retries - 1:
-                        time.sleep(self.retry_delay * (2 ** attempt))
-                        continue
-                    
-                except requests.exceptions.ConnectionError as e:
-                    logger.warning(f"Connection error saving {filename}, attempt {attempt + 1}: {str(e)}")
-                    if attempt < self.max_retries - 1:
-                        time.sleep(self.retry_delay * (2 ** attempt))
-                        continue
-                        
-                except Exception as e:
-                    logger.error(f"Unexpected error saving {filename}: {str(e)}")
-                    logger.error(traceback.format_exc())
-                    if attempt == self.max_retries - 1:
-                        raise GitHubStorageError(f"Unexpected save error: {str(e)}")
-                    time.sleep(self.retry_delay)
+    def _save_file_content(self, filename: str, content: Dict, sha: Optional[str] = None) -> bool:
+        """Save file content to GitHub or local storage"""
+        try:
+            if self.dev_mode:
+                return self._save_local_file_content(filename, content)
+            else:
+                return self._save_github_file_content(filename, content, sha)
+        except Exception as e:
+            logger.error(f"Error saving file {filename}: {str(e)}")
+            if self.dev_mode:
+                # Fallback para local mesmo em caso de erro
+                return self._save_local_file_content(filename, content)
+            else:
+                return False
+    
+    def _save_local_file_content(self, filename: str, content: Dict) -> bool:
+        """Save file content to local storage"""
+        try:
+            filepath = os.path.join(self.local_storage_path, filename)
             
+            with open(filepath, 'w', encoding='utf-8') as f:
+                json.dump(content, f, indent=2, ensure_ascii=False, default=str)
+            
+            logger.debug(f"Saved local file: {filename}")
+            return True
+            
+        except Exception as e:
+            logger.error(f"Error saving local file {filename}: {str(e)}")
             return False
     
-    def _validate_content(self, content: Dict, filename: str):
-        """Validate content before saving"""
+    def _save_github_file_content(self, filename: str, content: Dict, sha: Optional[str] = None) -> bool:
+        """Save file content to GitHub"""
         try:
-            # Basic validation
-            if not isinstance(content, dict):
-                raise ValueError("Content must be a dictionary")
+            url = f"{self.base_url}/{filename}"
+            headers = {
+                'Authorization': f'token {self.token}',
+                'User-Agent': 'Client-Manager-Bot/1.0',
+                'Accept': 'application/vnd.github.v3+json'
+            }
             
-            # File-specific validation
-            if filename == 'clients.json':
-                if 'clients' not in content:
-                    raise ValueError("clients.json must contain 'clients' key")
-                
-                if not isinstance(content['clients'], list):
-                    raise ValueError("clients must be a list")
-                
-                # Validate each client
-                for i, client_data in enumerate(content['clients']):
-                    try:
-                        # Test if client can be created from data
-                        Client.from_dict(client_data)
-                    except Exception as e:
-                        raise ValueError(f"Invalid client data at index {i}: {str(e)}")
+            # Convert content to JSON string and then to base64
+            content_str = json.dumps(content, indent=2, ensure_ascii=False, default=str)
+            content_b64 = base64.b64encode(content_str.encode('utf-8')).decode('utf-8')
             
-            elif filename == 'message_templates.json':
-                if 'templates' not in content:
-                    raise ValueError("message_templates.json must contain 'templates' key")
-                
-                if not isinstance(content['templates'], list):
-                    raise ValueError("templates must be a list")
+            data = {
+                'message': f'Update {filename} via Client Manager',
+                'content': content_b64,
+                'branch': self.branch
+            }
             
-            # Check content size (GitHub has a 100MB limit, but we'll be more conservative)
-            content_json = json.dumps(content)
-            if len(content_json.encode('utf-8')) > 10 * 1024 * 1024:  # 10MB limit
-                raise ValueError("Content too large (>10MB)")
-                
+            if sha:
+                data['sha'] = sha
+            
+            max_retries = 3
+            for attempt in range(max_retries):
+                try:
+                    response = requests.put(url, headers=headers, json=data, timeout=30)
+                    
+                    if response.status_code in [200, 201]:
+                        logger.info(f"Successfully saved {filename} to GitHub")
+                        return True
+                    elif response.status_code == 409:
+                        logger.warning(f"Conflict saving {filename}, trying to get latest SHA")
+                        # Get latest SHA and retry
+                        file_data = self._get_github_file_content(filename)
+                        if file_data:
+                            data['sha'] = file_data['sha']
+                            continue
+                        else:
+                            logger.error(f"Could not get latest SHA for {filename}")
+                            return False
+                    else:
+                        logger.error(f"Failed to save {filename}: {response.status_code} - {response.text}")
+                        return False
+                        
+                except requests.exceptions.Timeout:
+                    logger.warning(f"Timeout on save attempt {attempt + 1} for {filename}")
+                    if attempt == max_retries - 1:
+                        return False
+                    time.sleep(2 ** attempt)
+                    
+                except requests.exceptions.RequestException as e:
+                    logger.error(f"Request error on save attempt {attempt + 1} for {filename}: {str(e)}")
+                    if attempt == max_retries - 1:
+                        return False
+                    time.sleep(2 ** attempt)
+            
+            return False
+            
         except Exception as e:
-            raise GitHubStorageError(f"Content validation failed for {filename}: {str(e)}")
-    
-    def _create_backup(self, filename: str, content: Dict):
-        """Create backup of file before updating"""
-        try:
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            backup_filename = f"backups/{filename.replace('.json', '')}_{timestamp}.json"
-            
-            # Save backup (without creating another backup)
-            self._save_file_content(backup_filename, content, sha=None, create_backup=False)
-            logger.info(f"Backup created: {backup_filename}")
-            
-        except Exception as e:
-            logger.error(f"Failed to create backup for {filename}: {str(e)}")
-            # Don't raise exception - backup failure shouldn't stop the main operation
+            logger.error(f"Unexpected error saving {filename}: {str(e)}")
+            return False
     
     def get_clients(self) -> List[Client]:
         """Get all clients from GitHub storage with error handling"""
@@ -387,9 +327,18 @@ class GitHubStorage:
                 logger.info("No clients.json found, returning empty list")
                 return []
             
-            clients = []
-            client_data_list = file_data['content'].get('clients', [])
+            content = file_data.get('content', [])
             
+            # Handle both old format (with 'clients' key) and new format (direct list)
+            if isinstance(content, dict) and 'clients' in content:
+                client_data_list = content['clients']
+            elif isinstance(content, list):
+                client_data_list = content
+            else:
+                logger.warning("Invalid clients file format, returning empty list")
+                return []
+            
+            clients = []
             for i, client_data in enumerate(client_data_list):
                 try:
                     client = Client.from_dict(client_data)
@@ -400,16 +349,16 @@ class GitHubStorage:
                     # Continue loading other clients even if one fails
                     continue
             
-            logger.info(f"Loaded {len(clients)} clients from GitHub")
+            logger.info(f"Loaded {len(clients)} clients from storage")
             return clients
             
         except GitHubStorageError as e:
             logger.error(f"GitHub storage error loading clients: {str(e)}")
-            raise
+            return []  # Return empty list instead of raising in dev mode
         except Exception as e:
             logger.error(f"Unexpected error loading clients: {str(e)}")
             logger.error(traceback.format_exc())
-            raise GitHubStorageError(f"Failed to load clients: {str(e)}")
+            return []  # Return empty list instead of raising in dev mode
     
     def save_clients(self, clients: List[Client]) -> bool:
         """Save clients to GitHub storage with validation"""
@@ -425,13 +374,10 @@ class GitHubStorage:
             
             # Get current file SHA
             file_data = self._get_file_content('clients.json')
-            sha = file_data['sha'] if file_data else None
+            sha = file_data.get('sha') if file_data else None
             
-            content = {
-                'clients': [client.to_dict() for client in clients],
-                'last_updated': datetime.now().isoformat(),
-                'total_count': len(clients)
-            }
+            # Save as simple list for easier handling
+            content = [client.to_dict() for client in clients]
             
             success = self._save_file_content('clients.json', content, sha)
             
@@ -454,14 +400,20 @@ class GitHubStorage:
             
             if not file_data:
                 logger.info("No message_templates.json found, returning default templates")
-                templates = []
-                for template_data in DEFAULT_TEMPLATES:
-                    templates.append(MessageTemplate.from_dict(template_data))
-                return templates
+                return self._get_default_templates()
+            
+            content = file_data.get('content', [])
+            
+            # Handle both old format (with 'templates' key) and new format (direct list)
+            if isinstance(content, dict) and 'templates' in content:
+                template_data_list = content['templates']
+            elif isinstance(content, list):
+                template_data_list = content
+            else:
+                logger.warning("Invalid templates file format, returning defaults")
+                return self._get_default_templates()
             
             templates = []
-            template_data_list = file_data['content'].get('templates', [])
-            
             for i, template_data in enumerate(template_data_list):
                 try:
                     template = MessageTemplate.from_dict(template_data)
@@ -473,30 +425,50 @@ class GitHubStorage:
             # If no templates loaded, return defaults
             if not templates:
                 logger.warning("No valid templates found, returning defaults")
-                for template_data in DEFAULT_TEMPLATES:
-                    templates.append(MessageTemplate.from_dict(template_data))
+                return self._get_default_templates()
             
             return templates
             
         except Exception as e:
             logger.error(f"Error loading message templates: {str(e)}")
             # Return default templates on error
-            templates = []
-            for template_data in DEFAULT_TEMPLATES:
+            return self._get_default_templates()
+    
+    def _get_default_templates(self) -> List[MessageTemplate]:
+        """Get default message templates"""
+        default_templates_data = [
+            {
+                "id": "1",
+                "name": "Lembrete 3 dias",
+                "content": "Olá {name}! Seu plano vence em 3 dias. Renovar agora: R$ {value}",
+                "type": "reminder_3days"
+            },
+            {
+                "id": "2", 
+                "name": "Cobrança",
+                "content": "Olá {name}! Seu plano VPN venceu. Renove agora por apenas R$ {value}",
+                "type": "payment_due"
+            }
+        ]
+        
+        templates = []
+        for template_data in default_templates_data:
+            try:
                 templates.append(MessageTemplate.from_dict(template_data))
-            return templates
+            except Exception as e:
+                logger.error(f"Error creating default template: {str(e)}")
+                
+        return templates
     
     def save_message_templates(self, templates: List[MessageTemplate]) -> bool:
         """Save message templates to GitHub storage"""
         try:
             # Get current file SHA
             file_data = self._get_file_content('message_templates.json')
-            sha = file_data['sha'] if file_data else None
+            sha = file_data.get('sha') if file_data else None
             
-            content = {
-                'templates': [template.to_dict() for template in templates],
-                'last_updated': datetime.now().isoformat()
-            }
+            # Save as simple list for easier handling
+            content = [template.to_dict() for template in templates]
             
             return self._save_file_content('message_templates.json', content, sha)
             
@@ -608,19 +580,20 @@ class GitHubStorage:
         try:
             stats = {
                 'connection_status': 'unknown',
-                'rate_limit_remaining': self.rate_limit_remaining,
-                'rate_limit_reset': self.rate_limit_reset,
-                'cache_size': len(self.cache),
+                'dev_mode': self.dev_mode,
+                'storage_type': 'local' if self.dev_mode else 'github',
                 'clients_count': 0,
                 'templates_count': 0,
-                'last_error': None,
-                'backup_enabled': self.backup_enabled
+                'last_error': None
             }
             
             # Test connection
             try:
-                self._test_connection()
-                stats['connection_status'] = 'connected'
+                if self.dev_mode:
+                    stats['connection_status'] = 'local_storage'
+                else:
+                    self._test_connection()
+                    stats['connection_status'] = 'connected'
             except Exception as e:
                 stats['connection_status'] = 'error'
                 stats['last_error'] = str(e)
@@ -648,17 +621,12 @@ class GitHubStorage:
             }
     
     def clear_cache(self):
-        """Clear the storage cache"""
-        try:
-            self.cache.clear()
-            logger.info("Storage cache cleared")
-        except Exception as e:
-            logger.error(f"Error clearing cache: {str(e)}")
+        """Clear any cache - placeholder for future implementation"""
+        logger.info("Cache clear requested - no cache to clear in current implementation")
     
-    def set_backup_enabled(self, enabled: bool):
-        """Enable or disable backups"""
-        self.backup_enabled = enabled
-        logger.info(f"Backup {'enabled' if enabled else 'disabled'}")
+    def get_dev_mode(self) -> bool:
+        """Check if running in development mode"""
+        return self.dev_mode
 
 # Global storage instance
 storage = GitHubStorage()

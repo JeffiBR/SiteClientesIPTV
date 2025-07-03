@@ -1,0 +1,14 @@
+[
+  {
+    "id": "1",
+    "name": "Lembrete 3 dias",
+    "content": "Olá {name}! Seu plano vence em 3 dias. Renovar agora: R$ {value}",
+    "type": "reminder_3days"
+  },
+  {
+    "id": "2",
+    "name": "Cobrança",
+    "content": "Olá {name}! Seu plano VPN venceu. Renove agora por apenas R$ {value}",
+    "type": "payment_due"
+  }
+]
