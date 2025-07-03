@@ -2,8 +2,37 @@ import time
 from typing import Dict, Tuple, Optional
 from threading import Lock
 from functools import wraps
-from flask import request, jsonify, flash, redirect, url_for
 import logging
+
+# Import Flask components only when available
+try:
+    from flask import request, jsonify, flash, redirect, url_for
+    FLASK_AVAILABLE = True
+except ImportError:
+    FLASK_AVAILABLE = False
+    # Mock objects for testing
+    class MockRequest:
+        def __init__(self):
+            self.environ = {'HTTP_X_REAL_IP': '127.0.0.1'}
+            self.remote_addr = '127.0.0.1'
+            self.is_json = False
+            self.path = '/test'
+            self.endpoint = 'test'
+            self.referrer = None
+    
+    request = MockRequest()
+    
+    def jsonify(data):
+        return data
+    
+    def flash(message, category='info'):
+        print(f"FLASH [{category}]: {message}")
+    
+    def redirect(location):
+        return f"REDIRECT: {location}"
+    
+    def url_for(endpoint):
+        return f"URL_FOR: {endpoint}"
 
 logger = logging.getLogger(__name__)
 

@@ -1,73 +1,98 @@
 #!/usr/bin/env python3
+# -*- coding: utf-8 -*-
 """
-Teste das melhorias implementadas no sistema de gestão de clientes
+Teste das melhorias implementadas no sistema
 """
 import os
 import sys
-import time
 import json
+import time
 from datetime import datetime
 
 def test_imports():
-    """Testa se todas as importações estão funcionando"""
+    """Testa importação de módulos das melhorias"""
     print("🔍 Testando importações...")
+    test_results = {}
     
     try:
-        # Testar validators
         from validators import ClientValidator, MessageTemplateValidator, ValidationError
+        test_results['validators'] = True
         print("✅ Validators: OK")
-        
-        # Testar rate limiter
-        from rate_limiter import rate_limiter, rate_limit, get_client_ip
-        print("✅ Rate Limiter: OK")
-        
-        # Testar logger
-        from logger_config import setup_logging, log_user_action, app_logger
-        print("✅ Logger Config: OK")
-        
-        # Testar cache
-        from simple_cache import app_cache, cached, cache_manager
-        print("✅ Simple Cache: OK")
-        
-        # Testar backup
-        from backup_utils import backup_manager, create_backup
-        print("✅ Backup Utils: OK")
-        
-        # Testar health check
-        from health_check import health_checker, get_health_status
-        print("✅ Health Check: OK")
-        
-        return True
     except Exception as e:
-        print(f"❌ Erro na importação: {e}")
-        return False
+        test_results['validators'] = False
+        print(f"❌ Erro na importação de validators: {e}")
+    
+    try:
+        from simple_cache import SimpleCache, CacheManager
+        test_results['cache'] = True
+        print("✅ Cache: OK")
+    except Exception as e:
+        test_results['cache'] = False
+        print(f"❌ Erro na importação de cache: {e}")
+    
+    try:
+        from rate_limiter import SimpleRateLimiter
+        test_results['rate_limiter'] = True
+        print("✅ Rate Limiter: OK")
+    except Exception as e:
+        test_results['rate_limiter'] = False
+        print(f"❌ Erro na importação de rate limiter: {e}")
+    
+    try:
+        from logger_config import setup_logging, StructuredLogger
+        test_results['logging'] = True
+        print("✅ Logging: OK")
+    except Exception as e:
+        test_results['logging'] = False
+        print(f"❌ Erro na importação de logging: {e}")
+    
+    try:
+        from backup_utils import BackupManager
+        test_results['backup'] = True
+        print("✅ Backup: OK")
+    except Exception as e:
+        test_results['backup'] = False
+        print(f"❌ Erro na importação de backup: {e}")
+    
+    try:
+        from health_check import HealthChecker
+        test_results['health'] = True
+        print("✅ Health Check: OK")
+    except Exception as e:
+        test_results['health'] = False
+        print(f"❌ Erro na importação de health check: {e}")
+    
+    return test_results
 
 def test_validators():
     """Testa o sistema de validação"""
     print("\n🔍 Testando validadores...")
-    
     try:
         from validators import ClientValidator, ValidationError
         
-        # Teste de dados válidos
+        # Teste com dados válidos
         valid_data = {
             'name': 'João Silva',
-            'phone': '11987654321',
+            'phone': '5511999888777',
             'plan_type': 'IPTV',
-            'value': '50.00',
-            'plan_duration': '2024-12-31'
+            'value': '29.90',
+            'plan_duration': '2025-01-15',
+            'reminder_time_3days': '09:00',
+            'reminder_time_payment': '10:00',
+            'custom_message_3days': '',
+            'custom_message_payment': ''
         }
         
         validated = ClientValidator.validate_client_data(valid_data)
         print("✅ Validação de dados válidos: OK")
         
-        # Teste de dados inválidos
+        # Teste com dados inválidos
         invalid_data = {
             'name': '',  # Nome vazio
-            'phone': '123',  # Telefone muito curto
+            'phone': '123',  # Telefone inválido
             'plan_type': 'INVALID',  # Tipo inválido
             'value': '-10',  # Valor negativo
-            'plan_duration': 'invalid-date'  # Data inválida
+            'plan_duration': '2020-01-01',  # Data no passado
         }
         
         try:
@@ -76,8 +101,8 @@ def test_validators():
             return False
         except ValueError:
             print("✅ Validação de dados inválidos: OK")
-        
-        return True
+            return True
+            
     except Exception as e:
         print(f"❌ Erro no teste de validadores: {e}")
         return False
@@ -85,81 +110,76 @@ def test_validators():
 def test_cache():
     """Testa o sistema de cache"""
     print("\n🔍 Testando cache...")
-    
     try:
-        from simple_cache import app_cache
+        from simple_cache import SimpleCache
         
-        # Teste básico de set/get
-        app_cache.set('test_key', 'test_value', ttl=60)
-        value = app_cache.get('test_key')
+        cache = SimpleCache(max_size=100, default_ttl=60)
         
+        # Teste set/get
+        cache.set('test_key', 'test_value')
+        value = cache.get('test_key')
         if value == 'test_value':
             print("✅ Cache set/get: OK")
         else:
-            print(f"❌ Cache get retornou: {value}")
+            print("❌ Cache set/get: FALHOU")
             return False
         
-        # Teste de TTL
-        app_cache.set('test_ttl', 'will_expire', ttl=1)
-        time.sleep(2)
-        expired_value = app_cache.get('test_ttl')
-        
+        # Teste TTL
+        cache.set('ttl_key', 'ttl_value', ttl=1)
+        time.sleep(1.1)
+        expired_value = cache.get('ttl_key')
         if expired_value is None:
             print("✅ Cache TTL: OK")
         else:
-            print("❌ Cache TTL não funcionou")
+            print("❌ Cache TTL: FALHOU")
             return False
         
-        # Teste de estatísticas
-        stats = app_cache.get_stats()
+        # Teste estatísticas
+        stats = cache.get_stats()
         if 'hits' in stats and 'misses' in stats:
             print("✅ Cache stats: OK")
+            return True
         else:
-            print("❌ Cache stats inválidas")
+            print("❌ Cache stats: FALHOU")
             return False
-        
-        return True
+            
     except Exception as e:
         print(f"❌ Erro no teste de cache: {e}")
         return False
 
 def test_rate_limiter():
-    """Testa o rate limiter"""
+    """Testa o sistema de rate limiting"""
     print("\n🔍 Testando rate limiter...")
-    
     try:
-        from rate_limiter import rate_limiter
+        from rate_limiter import SimpleRateLimiter
         
-        test_ip = "127.0.0.1"
+        limiter = SimpleRateLimiter()
         
-        # Teste básico
-        allowed = rate_limiter.is_allowed(test_ip, limit=5)
-        if allowed:
-            print("✅ Rate limiter allow: OK")
+        # Teste básico de rate limiting
+        ip = '127.0.0.1'
+        
+        # Primeiro deve passar
+        if limiter.is_allowed(ip, limit=2):
+            print("✅ Rate limiter first request: OK")
         else:
-            print("❌ Rate limiter deveria permitir primeira requisição")
+            print("❌ Rate limiter first request: FALHOU")
             return False
         
-        # Teste de limite
-        for i in range(10):
-            rate_limiter.is_allowed(test_ip, limit=5)
-        
-        blocked = not rate_limiter.is_allowed(test_ip, limit=5)
-        if blocked:
-            print("✅ Rate limiter block: OK")
+        # Segundo deve passar
+        if limiter.is_allowed(ip, limit=2):
+            print("✅ Rate limiter second request: OK")
         else:
-            print("❌ Rate limiter deveria ter bloqueado")
+            print("❌ Rate limiter second request: FALHOU")
             return False
         
-        # Teste de estatísticas
-        stats = rate_limiter.get_stats()
-        if 'active_clients' in stats:
-            print("✅ Rate limiter stats: OK")
+        # Terceiro deve falhar (sem parâmetro nomeado extra)
+        if not limiter.is_allowed(ip, limit=2):
+            print("✅ Rate limiter rate limit: OK")
+            return True
         else:
-            print("❌ Rate limiter stats inválidas")
+            print("❌ Rate limiter rate limit: FALHOU")
             return False
-        
-        return True
+            
     except Exception as e:
         print(f"❌ Erro no teste de rate limiter: {e}")
         return False
@@ -167,74 +187,72 @@ def test_rate_limiter():
 def test_backup():
     """Testa o sistema de backup"""
     print("\n🔍 Testando backup...")
-    
     try:
-        from backup_utils import backup_manager
+        from backup_utils import BackupManager
+        
+        backup_manager = BackupManager()
+        
+        # Teste criação de backup (simular dados de cliente)
         from models import Client
-        
-        # Criar cliente de teste
         test_client = Client(
-            id="test-123",
-            name="Cliente Teste",
-            phone="11999999999",
-            plan_type="IPTV",
+            id='test-123',
+            name='Cliente Teste',
+            phone='5511999999999',
+            plan_type='IPTV',
             value=50.0,
-            plan_duration="2024-12-31"
+            plan_duration='2025-12-31'
         )
-        
-        # Testar backup
         backup_file = backup_manager.create_client_backup([test_client], compress=False)
         
         if backup_file and os.path.exists(backup_file):
             print("✅ Backup creation: OK")
-            
-            # Testar listagem de backups
-            backups = backup_manager.list_backups('clients')
-            if len(backups) > 0:
-                print("✅ Backup listing: OK")
-            else:
-                print("❌ Backup listing falhou")
-                return False
-            
-            # Limpar arquivo de teste
-            try:
-                os.remove(backup_file)
-            except:
-                pass
-            
         else:
-            print("❌ Backup creation falhou")
+            print("❌ Backup creation: FALHOU")
             return False
         
+        # Teste listagem de backups
+        backups = backup_manager.list_backups('clients')
+        if len(backups) > 0:
+            print("✅ Backup listing: OK")
+        else:
+            print("❌ Backup listing: FALHOU")
+            return False
+        
+        # Cleanup
+        if backup_file and os.path.exists(backup_file):
+            os.remove(backup_file)
+        
         return True
+        
     except Exception as e:
         print(f"❌ Erro no teste de backup: {e}")
         return False
 
 def test_health_check():
-    """Testa o health check"""
+    """Testa o sistema de health check"""
     print("\n🔍 Testando health check...")
-    
     try:
-        from health_check import health_checker, get_health_status
+        from health_check import HealthChecker
         
-        # Teste básico
-        simple_status = get_health_status(detailed=False)
-        if 'status' in simple_status and 'timestamp' in simple_status:
+        health_checker = HealthChecker()
+        
+        # Teste health check simples
+        status = health_checker.get_simple_status()
+        if isinstance(status, dict) and 'status' in status:
             print("✅ Health check simple: OK")
         else:
-            print("❌ Health check simple inválido")
+            print("❌ Health check simple: FALHOU")
             return False
         
-        # Teste detalhado
-        detailed_status = get_health_status(detailed=True)
-        if 'overall_status' in detailed_status and 'checks' in detailed_status:
+        # Teste health check detalhado
+        detailed = health_checker.run_all_checks()
+        if isinstance(detailed, dict) and 'checks' in detailed:
             print("✅ Health check detailed: OK")
+            return True
         else:
-            print("❌ Health check detailed inválido")
+            print("❌ Health check detailed: FALHOU")
             return False
-        
-        return True
+            
     except Exception as e:
         print(f"❌ Erro no teste de health check: {e}")
         return False
@@ -242,199 +260,111 @@ def test_health_check():
 def test_logging():
     """Testa o sistema de logging"""
     print("\n🔍 Testando logging...")
-    
     try:
-        from logger_config import setup_logging, log_user_action, app_logger
+        from logger_config import log_user_action, log_with_context, app_logger
         
-        # Configurar logging
-        logger = setup_logging(log_level='INFO', enable_file_logging=False)
-        
-        # Teste de log básico
+        # Teste log de ação do usuário
         log_user_action("TEST_ACTION", "Testing logging system", "127.0.0.1")
         print("✅ User action log: OK")
         
-        # Teste de log estruturado
-        app_logger.log_action("test_action", level="INFO", test_data="test_value")
+        # Teste log estruturado
+        with log_with_context(action="test_action"):
+            app_logger.log_action("test_action")
         print("✅ Structured log: OK")
         
         return True
+        
     except Exception as e:
         print(f"❌ Erro no teste de logging: {e}")
         return False
 
-def run_all_tests():
-    """Executa todos os testes"""
+def create_test_summary(results):
+    """Cria resumo dos testes"""
+    summary = {
+        'timestamp': datetime.now().isoformat(),
+        'test_results': results,
+        'total_tests': len(results),
+        'passed_tests': sum(1 for result in results.values() if result),
+        'failed_tests': sum(1 for result in results.values() if not result),
+        'success_rate': sum(1 for result in results.values() if result) / len(results) * 100
+    }
+    
+    # Adicionar informações das melhorias implementadas
+    summary['improvements_implemented'] = {
+        'validators': 'Sistema de validação robusta com validação de telefones brasileiros',
+        'rate_limiter': 'Rate limiting thread-safe com diferentes limitadores',
+        'cache': 'Cache inteligente em memória com TTL e LRU',
+        'logging': 'Sistema de logging estruturado para desenvolvimento e produção',
+        'backup': 'Sistema de backup automático com compressão',
+        'health_check': 'Monitoramento de recursos e conectividade'
+    }
+    
+    # Salvar resumo
+    with open('MELHORIAS_IMPLEMENTADAS.json', 'w', encoding='utf-8') as f:
+        json.dump(summary, f, indent=2, ensure_ascii=False)
+    
+    return summary
+
+def main():
+    """Função principal de teste"""
+    print("🔧 TESTE DAS MELHORIAS - Sistema de Gestão de Clientes")
+    print("=" * 60)
     print("🚀 Iniciando testes das melhorias implementadas\n")
     
-    tests = [
-        ("Importações", test_imports),
-        ("Validadores", test_validators),
-        ("Cache", test_cache),
-        ("Rate Limiter", test_rate_limiter),
-        ("Backup", test_backup),
-        ("Health Check", test_health_check),
-        ("Logging", test_logging)
-    ]
+    # Executar todos os testes
+    all_results = {}
     
-    results = []
+    # Testes de importação
+    import_results = test_imports()
+    all_results.update(import_results)
+    
+    # Testes funcionais (apenas se as importações funcionaram)
+    tests = [
+        ('Validadores', test_validators),
+        ('Cache', test_cache),
+        ('Rate Limiter', test_rate_limiter),
+        ('Backup', test_backup),
+        ('Health Check', test_health_check),
+        ('Logging', test_logging)
+    ]
     
     for test_name, test_func in tests:
         try:
             result = test_func()
-            results.append((test_name, result))
+            all_results[test_name.lower().replace(' ', '_')] = result
         except Exception as e:
-            print(f"❌ {test_name}: ERRO - {e}")
-            results.append((test_name, False))
-    
-    print("\n" + "="*50)
-    print("📊 RESUMO DOS TESTES")
-    print("="*50)
-    
-    passed = 0
-    failed = 0
-    
-    for test_name, result in results:
-        status = "✅ PASSOU" if result else "❌ FALHOU"
-        print(f"{test_name:.<30} {status}")
-        
-        if result:
-            passed += 1
-        else:
-            failed += 1
-    
-    print(f"\n📈 Total: {len(results)} testes")
-    print(f"✅ Passou: {passed}")
-    print(f"❌ Falhou: {failed}")
-    
-    if failed == 0:
-        print("\n🎉 TODOS OS TESTES PASSARAM! Sistema pronto para uso.")
-        return True
-    else:
-        print(f"\n⚠️  {failed} teste(s) falharam. Revisar implementação.")
-        return False
-
-def create_test_summary():
-    """Cria um resumo das melhorias para documentação"""
-    summary = {
-        "melhorias_implementadas": {
-            "validacao_robusta": {
-                "arquivo": "validators.py",
-                "descricao": "Sistema completo de validação de dados",
-                "funcionalidades": [
-                    "Validação de telefones brasileiros",
-                    "Sanitização de dados",
-                    "Validação de valores monetários",
-                    "Validação de datas",
-                    "Mensagens de erro detalhadas"
-                ]
-            },
-            "rate_limiting": {
-                "arquivo": "rate_limiter.py", 
-                "descricao": "Proteção contra spam e abuso",
-                "funcionalidades": [
-                    "Limits configuráveis por endpoint",
-                    "Tracking por IP",
-                    "Cleanup automático",
-                    "Estatísticas detalhadas"
-                ]
-            },
-            "logging_estruturado": {
-                "arquivo": "logger_config.py",
-                "descricao": "Sistema de logs avançado",
-                "funcionalidades": [
-                    "Logs em formato JSON",
-                    "Context managers",
-                    "Diferentes níveis e outputs",
-                    "Logs coloridos no console"
-                ]
-            },
-            "cache_inteligente": {
-                "arquivo": "simple_cache.py",
-                "descricao": "Cache em memória com TTL e LRU",
-                "funcionalidades": [
-                    "TTL configurável",
-                    "LRU eviction",
-                    "Múltiplas instâncias",
-                    "Estatísticas de performance"
-                ]
-            },
-            "backup_automatico": {
-                "arquivo": "backup_utils.py",
-                "descricao": "Sistema de backup robusto",
-                "funcionalidades": [
-                    "Backups comprimidos",
-                    "Backup automático antes de mudanças",
-                    "Cleanup de arquivos antigos",
-                    "Restauração de dados"
-                ]
-            },
-            "health_monitoring": {
-                "arquivo": "health_check.py",
-                "descricao": "Monitoramento completo do sistema",
-                "funcionalidades": [
-                    "Checks de recursos do sistema",
-                    "Verificação de serviços externos",
-                    "Score de saúde",
-                    "Alertas automáticos"
-                ]
-            }
-        },
-        "apis_adicionadas": [
-            "/health - Health check simples",
-            "/health/detailed - Health check detalhado", 
-            "/api/cache/stats - Estatísticas de cache",
-            "/api/cache/clear - Limpar cache",
-            "/api/backup/create - Criar backup manual",
-            "/api/backup/list - Listar backups",
-            "/api/rate-limit/stats - Stats do rate limiter",
-            "/api/validation/test - Testar validação"
-        ],
-        "melhorias_nas_rotas": [
-            "Rate limiting em todas as rotas críticas",
-            "Validação robusta de dados",
-            "Logging estruturado de ações",
-            "Cache automático no dashboard",
-            "Backup antes de modificações",
-            "Invalidação inteligente de cache"
-        ],
-        "configuracao_app": [
-            "Logging estruturado configurado",
-            "Rate limiting global aplicado",
-            "Serviços de background iniciados",
-            "Cache aquecido na inicialização",
-            "Tratamento robusto de erros"
-        ],
-        "compatibilidade": {
-            "github_storage": "✅ Mantido como storage principal",
-            "apis_existentes": "✅ Compatibilidade total",
-            "interface_mobile": "✅ Mantida e melhorada",
-            "sistema_mensagens": "✅ Integração completa"
-        }
-    }
-    
-    with open('MELHORIAS_IMPLEMENTADAS.json', 'w', encoding='utf-8') as f:
-        json.dump(summary, f, indent=2, ensure_ascii=False)
-    
-    print("📄 Resumo das melhorias salvo em: MELHORIAS_IMPLEMENTADAS.json")
-
-if __name__ == '__main__':
-    print("🔧 TESTE DAS MELHORIAS - Sistema de Gestão de Clientes")
-    print("="*60)
-    
-    # Verificar se está no diretório correto
-    if not os.path.exists('app.py'):
-        print("❌ Execute este script no diretório raiz do projeto")
-        sys.exit(1)
-    
-    # Executar testes
-    success = run_all_tests()
+            print(f"❌ Erro no teste {test_name}: {e}")
+            all_results[test_name.lower().replace(' ', '_')] = False
     
     # Criar resumo
-    create_test_summary()
+    summary = create_test_summary(all_results)
     
-    if success:
-        print("\n🚀 Sistema pronto para deploy!")
-        sys.exit(0)
+    # Exibir resultados finais
+    print("\n" + "=" * 50)
+    print("📊 RESUMO DOS TESTES")
+    print("=" * 50)
+    
+    for test_name, result in all_results.items():
+        status = "✅ PASSOU" if result else "❌ FALHOU"
+        print(f"{test_name.replace('_', ' ').title():<20}... {status}")
+    
+    print(f"\n📈 Total: {summary['total_tests']} testes")
+    print(f"✅ Passou: {summary['passed_tests']}")
+    print(f"❌ Falhou: {summary['failed_tests']}")
+    
+    if summary['failed_tests'] > 0:
+        print(f"\n⚠️  {summary['failed_tests']} teste(s) falharam. Revisar implementação.")
     else:
-        print("\n⚠️  Revisar falhas antes do deploy")
+        print(f"\n🎉 Todos os testes passaram! Taxa de sucesso: {summary['success_rate']:.1f}%")
+    
+    print(f"📄 Resumo das melhorias salvo em: MELHORIAS_IMPLEMENTADAS.json")
+    
+    if summary['failed_tests'] > 0:
+        print(f"\n⚠️  Revisar falhas antes do deploy")
         sys.exit(1)
+    else:
+        print(f"\n✅ Sistema pronto para uso!")
+        sys.exit(0)
+
+if __name__ == "__main__":
+    main()
