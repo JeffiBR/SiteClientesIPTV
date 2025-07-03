@@ -3,160 +3,544 @@
 {% block title %}Clientes - Bot Cliente Manager{% endblock %}
 
 {% block content %}
-<div class="row">
-    <div class="col-12">
-        <div class="d-flex justify-content-between align-items-center mb-4">
-            <h1>
-                <i class="bi bi-people"></i>
-                Clientes
-            </h1>
-            <a href="{{ url_for('add_client') }}" class="btn btn-primary">
-                <i class="bi bi-plus-circle"></i>
-                Adicionar Cliente
-            </a>
-        </div>
-    </div>
-</div>
-
-{% if clients %}
-<div class="row">
-    <div class="col-12">
-        <div class="card">
-            <div class="card-body">
-                <div class="table-responsive">
-                    <table class="table table-striped" id="clientsTable">
-                        <thead>
-                            <tr>
-                                <th>Cliente</th>
-                                <th class="d-none d-md-table-cell">Telefone</th>
-                                <th>Plano</th>
-                                <th class="d-none d-lg-table-cell">Valor</th>
-                                <th class="d-none d-md-table-cell">Vencimento</th>
-                                <th>Status</th>
-                                <th class="d-none d-lg-table-cell">Dias</th>
-                                <th>Ações</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {% for client in clients %}
-                            <tr>
-                                <td>
-                                    <div>
-                                        <strong>{{ client.name }}</strong>
-                                        <div class="d-md-none">
-                                            <small class="text-muted">
-                                                <i class="bi bi-whatsapp"></i> {{ client.phone }}
-                                            </small>
-                                        </div>
-                                        <div class="d-lg-none">
-                                            <small class="text-muted">R$ {{ "%.2f"|format(client.value) }}</small>
-                                        </div>
-                                    </div>
-                                </td>
-                                <td class="d-none d-md-table-cell">
-                                    <i class="bi bi-whatsapp text-success"></i>
-                                    {{ client.phone }}
-                                </td>
-                                <td>
-                                    <span class="badge bg-{{ 'info' if client.plan_type == 'IPTV' else 'secondary' }}">
-                                        {{ client.plan_type }}
-                                    </span>
-                                    <div class="d-md-none">
-                                        <small class="text-muted">{{ client.plan_duration }}</small>
-                                    </div>
-                                </td>
-                                <td class="d-none d-lg-table-cell">R$ {{ "%.2f"|format(client.value) }}</td>
-                                <td class="d-none d-md-table-cell">
-                                    <span class="text-muted">
-                                        {{ client.plan_duration }}
-                                    </span>
-                                </td>
-                                <td>
-                                    {% if client.status == 'ativo' %}
-                                        <span class="badge bg-success">Ativo</span>
-                                    {% elif client.status == 'vencendo' %}
-                                        <span class="badge bg-warning">Vencendo</span>
-                                    {% else %}
-                                        <span class="badge bg-danger">Expirado</span>
-                                    {% endif %}
-                                    <div class="d-lg-none">
-                                        <small class="text-{{ 'success' if client.days_until_expiration > 3 else 'warning' if client.days_until_expiration > 0 else 'danger' }}">
-                                            {{ client.days_until_expiration }} d
-                                        </small>
-                                    </div>
-                                </td>
-                                <td class="d-none d-lg-table-cell">
-                                    {% if client.days_until_expiration >= 0 %}
-                                        <span class="text-{{ 'success' if client.days_until_expiration > 3 else 'warning' if client.days_until_expiration > 0 else 'danger' }}">
-                                            {{ client.days_until_expiration }} dias
-                                        </span>
-                                    {% else %}
-                                        <span class="text-danger">
-                                            {{ client.days_until_expiration|abs }} dias atraso
-                                        </span>
-                                    {% endif %}
-                                </td>
-                                <td>
-                                    <div class="btn-group btn-group-sm" role="group">
-                                        <a href="{{ url_for('edit_client', client_id=client.id) }}" 
-                                           class="btn btn-outline-warning" title="Editar">
-                                            <i class="bi bi-pencil"></i>
-                                        </a>
-                                        <button type="button" class="btn btn-outline-danger" 
-                                                onclick="confirmDelete('{{ client.id }}', '{{ client.name }}')" 
-                                                title="Excluir">
-                                            <i class="bi bi-trash"></i>
-                                        </button>
-                                    </div>
-                                </td>
-                            </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
+<!-- Desktop Header -->
+<div class="d-none d-md-block">
+    <div class="row">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h1>
+                    <i class="bi bi-people-fill"></i>
+                    Gestão de Clientes
+                </h1>
+                <div class="d-flex gap-2">
+                    <button class="btn btn-outline-secondary" onclick="exportClients()">
+                        <i class="bi bi-download"></i>
+                        Exportar
+                    </button>
+                    <a href="{{ url_for('add_client') }}" class="btn btn-primary">
+                        <i class="bi bi-person-plus"></i>
+                        Novo Cliente
+                    </a>
                 </div>
             </div>
         </div>
     </div>
 </div>
-{% else %}
-<div class="row">
-    <div class="col-12">
-        <div class="card">
-            <div class="card-body text-center">
-                <i class="bi bi-people fs-1 text-muted"></i>
-                <h3 class="text-muted">Nenhum cliente cadastrado</h3>
-                <p class="text-muted">Comece adicionando seu primeiro cliente</p>
+
+<!-- Mobile Header -->
+<div class="d-md-none mobile-header">
+    <div class="row">
+        <div class="col-12">
+            <h1 class="text-center">
+                <i class="bi bi-people-fill"></i>
+                Clientes
+            </h1>
+            <div class="mobile-actions">
+                <button class="btn btn-outline-secondary" onclick="exportClients()">
+                    <i class="bi bi-download"></i>
+                    Exportar
+                </button>
                 <a href="{{ url_for('add_client') }}" class="btn btn-primary">
-                    <i class="bi bi-plus-circle"></i>
-                    Adicionar Primeiro Cliente
+                    <i class="bi bi-person-plus"></i>
+                    Novo Cliente
                 </a>
             </div>
         </div>
     </div>
 </div>
+
+<!-- Desktop Filter and Search Bar -->
+<div class="row mb-4 d-none d-md-flex">
+    <div class="col-12">
+        <div class="card border-0 shadow-sm">
+            <div class="card-body">
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <input type="text" class="form-control" id="clientSearch" placeholder="🔍 Buscar por nome, telefone ou plano...">
+                    </div>
+                    <div class="col-md-3">
+                        <select class="form-select" id="statusFilter">
+                            <option value="">Todos os Status</option>
+                            <option value="ativo">Ativos</option>
+                            <option value="vencendo">Vencendo</option>
+                            <option value="expirado">Expirados</option>
+                        </select>
+                    </div>
+                    <div class="col-md-3">
+                        <select class="form-select" id="planFilter">
+                            <option value="">Todos os Planos</option>
+                            <option value="IPTV">IPTV</option>
+                            <option value="VPN">VPN</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Mobile Filters -->
+<div class="d-md-none mobile-filters">
+    <div class="container-fluid">
+        <input type="text" class="form-control" id="mobileClientSearch" placeholder="🔍 Buscar cliente...">
+        <div class="mobile-nav-tabs">
+            <button class="mobile-nav-tab active" data-filter="all">Todos</button>
+            <button class="mobile-nav-tab" data-filter="ativo">Ativos</button>
+            <button class="mobile-nav-tab" data-filter="vencendo">Vencendo</button>
+            <button class="mobile-nav-tab" data-filter="expirado">Expirados</button>
+        </div>
+    </div>
+</div>
+
+{% if clients %}
+<!-- Desktop Statistics Cards -->
+<div class="row mb-4 d-none d-md-flex">
+    <div class="col-md-3">
+        <div class="card border-0 shadow-sm">
+            <div class="card-body text-center">
+                <div class="text-primary mb-2">
+                    <i class="bi bi-people fs-2"></i>
+                </div>
+                <h4 class="mb-0">{{ clients|length }}</h4>
+                <small class="text-muted">Total de Clientes</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card border-0 shadow-sm">
+            <div class="card-body text-center">
+                <div class="text-success mb-2">
+                    <i class="bi bi-check-circle fs-2"></i>
+                </div>
+                <h4 class="mb-0">{{ clients|selectattr("status", "equalto", "ativo")|list|length }}</h4>
+                <small class="text-muted">Ativos</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card border-0 shadow-sm">
+            <div class="card-body text-center">
+                <div class="text-warning mb-2">
+                    <i class="bi bi-exclamation-triangle fs-2"></i>
+                </div>
+                <h4 class="mb-0">{{ clients|selectattr("status", "equalto", "vencendo")|list|length }}</h4>
+                <small class="text-muted">Vencendo</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card border-0 shadow-sm">
+            <div class="card-body text-center">
+                <div class="text-danger mb-2">
+                    <i class="bi bi-x-circle fs-2"></i>
+                </div>
+                <h4 class="mb-0">{{ clients|selectattr("status", "equalto", "expirado")|list|length }}</h4>
+                <small class="text-muted">Expirados</small>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Mobile Statistics -->
+<div class="d-md-none mobile-stats">
+    <div class="container-fluid">
+        <div class="row">
+            <div class="col-6 mb-3">
+                <div class="card border-0 shadow-sm">
+                    <div class="card-body text-center">
+                        <div class="stats-icon text-primary">
+                            <i class="bi bi-people"></i>
+                        </div>
+                        <div class="stats-number">{{ clients|length }}</div>
+                        <div class="stats-label">Total</div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-6 mb-3">
+                <div class="card border-0 shadow-sm">
+                    <div class="card-body text-center">
+                        <div class="stats-icon text-success">
+                            <i class="bi bi-check-circle"></i>
+                        </div>
+                        <div class="stats-number">{{ clients|selectattr("status", "equalto", "ativo")|list|length }}</div>
+                        <div class="stats-label">Ativos</div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-6">
+                <div class="card border-0 shadow-sm">
+                    <div class="card-body text-center">
+                        <div class="stats-icon text-warning">
+                            <i class="bi bi-exclamation-triangle"></i>
+                        </div>
+                        <div class="stats-number">{{ clients|selectattr("status", "equalto", "vencendo")|list|length }}</div>
+                        <div class="stats-label">Vencendo</div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-6">
+                <div class="card border-0 shadow-sm">
+                    <div class="card-body text-center">
+                        <div class="stats-icon text-danger">
+                            <i class="bi bi-x-circle"></i>
+                        </div>
+                        <div class="stats-number">{{ clients|selectattr("status", "equalto", "expirado")|list|length }}</div>
+                        <div class="stats-label">Expirados</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Desktop Table -->
+<div class="d-none d-md-block desktop-table">
+    <div class="row">
+        <div class="col-12">
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-white border-bottom-0">
+                    <h5 class="mb-0">
+                        <i class="bi bi-list-ul"></i>
+                        Lista de Clientes
+                    </h5>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover mb-0" id="clientsTable">
+                            <thead class="table-light">
+                                <tr>
+                                    <th class="border-0">Cliente</th>
+                                    <th class="border-0">Contato</th>
+                                    <th class="border-0">Plano</th>
+                                    <th class="border-0">Valor</th>
+                                    <th class="border-0">Vencimento</th>
+                                    <th class="border-0">Status</th>
+                                    <th class="border-0">Pagamento</th>
+                                    <th class="border-0">Ações</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for client in clients %}
+                                <tr class="client-row" data-status="{{ client.status }}" data-plan="{{ client.plan_type }}">
+                                    <td class="py-3">
+                                        <div class="d-flex align-items-center">
+                                            <div class="avatar-circle me-3">
+                                                {{ client.name[:2].upper() }}
+                                            </div>
+                                            <div>
+                                                <h6 class="mb-0">{{ client.name }}</h6>
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td class="py-3">
+                                        <div>
+                                            <i class="bi bi-whatsapp text-success me-1"></i>
+                                            <span class="text-muted">{{ client.phone }}</span>
+                                        </div>
+                                    </td>
+                                    <td class="py-3">
+                                        <span class="badge bg-{{ 'primary' if client.plan_type == 'IPTV' else 'info' }} fs-6">
+                                            {{ client.plan_type }}
+                                        </span>
+                                    </td>
+                                    <td class="py-3">
+                                        <strong class="text-success">R$ {{ "%.2f"|format(client.value) }}</strong>
+                                    </td>
+                                    <td class="py-3">
+                                        <span class="text-muted">{{ client.plan_duration }}</span>
+                                    </td>
+                                    <td class="py-3">
+                                        {% if client.status == 'ativo' %}
+                                            <span class="badge bg-success-soft text-success">
+                                                <i class="bi bi-check-circle me-1"></i>Ativo
+                                            </span>
+                                        {% elif client.status == 'vencendo' %}
+                                            <span class="badge bg-warning-soft text-warning">
+                                                <i class="bi bi-exclamation-triangle me-1"></i>Vencendo
+                                            </span>
+                                        {% else %}
+                                            <span class="badge bg-danger-soft text-danger">
+                                                <i class="bi bi-x-circle me-1"></i>Expirado
+                                            </span>
+                                        {% endif %}
+                                    </td>
+                                    <td class="py-3">
+                                        {% set current_status = client.payment_status if hasattr(client, 'payment_status') else 'pending' %}
+                                        {% if current_status == 'paid' %}
+                                            <span class="badge bg-success-soft text-success">
+                                                <i class="bi bi-check2 me-1"></i>Pago
+                                            </span>
+                                        {% else %}
+                                            <span class="badge bg-warning-soft text-warning">
+                                                <i class="bi bi-clock me-1"></i>Pendente
+                                            </span>
+                                        {% endif %}
+                                    </td>
+                                    <td class="py-3">
+                                        <div class="dropdown">
+                                            <button class="btn btn-outline-secondary btn-sm dropdown-toggle" type="button" data-bs-toggle="dropdown">
+                                                <i class="bi bi-three-dots"></i>
+                                            </button>
+                                            <ul class="dropdown-menu dropdown-menu-end">
+                                                <li>
+                                                    <a class="dropdown-item" href="{{ url_for('edit_client', client_id=client.id) }}">
+                                                        <i class="bi bi-pencil me-2"></i>Editar
+                                                    </a>
+                                                </li>
+                                                <li>
+                                                    <button class="dropdown-item" onclick="showRenewalModal('{{ client.id }}', '{{ client.name }}')">
+                                                        <i class="bi bi-arrow-clockwise me-2"></i>Renovar
+                                                    </button>
+                                                </li>
+                                                <li>
+                                                    <button class="dropdown-item" onclick="togglePaymentStatus('{{ client.id }}', '{{ current_status }}')">
+                                                        <i class="bi bi-credit-card me-2"></i>
+                                                        {% if current_status == 'paid' %}
+                                                            Marcar como Pendente
+                                                        {% else %}
+                                                            Marcar como Pago
+                                                        {% endif %}
+                                                    </button>
+                                                </li>
+                                                <li><hr class="dropdown-divider"></li>
+                                                <li>
+                                                    <button class="dropdown-item text-danger" onclick="confirmDelete('{{ client.id }}', '{{ client.name }}')">
+                                                        <i class="bi bi-trash me-2"></i>Excluir
+                                                    </button>
+                                                </li>
+                                            </ul>
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Mobile Client Cards -->
+<div class="d-md-none mobile-client-cards">
+    <div class="container-fluid">
+        {% for client in clients %}
+        {% set current_status = client.payment_status if hasattr(client, 'payment_status') else 'pending' %}
+        <div class="mobile-client-card animate-slide-in client-card" data-status="{{ client.status }}" data-plan="{{ client.plan_type }}" data-name="{{ client.name.lower() }}" data-phone="{{ client.phone }}">
+            <div class="mobile-client-header {{ client.plan_type.lower() }}">
+                <div class="mobile-client-name">{{ client.name }}</div>
+                <div class="mobile-client-plan">{{ client.plan_type }}</div>
+                <div class="mobile-status-badge">
+                    {% if client.status == 'ativo' %}
+                        <i class="bi bi-check-circle me-1"></i>Ativo
+                    {% elif client.status == 'vencendo' %}
+                        <i class="bi bi-exclamation-triangle me-1"></i>Vencendo
+                    {% else %}
+                        <i class="bi bi-x-circle me-1"></i>Expirado
+                    {% endif %}
+                </div>
+            </div>
+            <div class="mobile-client-body">
+                <div class="mobile-info-row">
+                    <div class="mobile-info-label">
+                        <i class="bi bi-whatsapp text-success"></i>
+                        Contato
+                    </div>
+                    <div class="mobile-info-value">{{ client.phone }}</div>
+                </div>
+                <div class="mobile-info-row">
+                    <div class="mobile-info-label">
+                        <i class="bi bi-currency-dollar"></i>
+                        Valor
+                    </div>
+                    <div class="mobile-info-value success">R$ {{ "%.2f"|format(client.value) }}</div>
+                </div>
+                <div class="mobile-info-row">
+                    <div class="mobile-info-label">
+                        <i class="bi bi-calendar-event"></i>
+                        Vencimento
+                    </div>
+                    <div class="mobile-info-value">{{ client.plan_duration }}</div>
+                </div>
+                <div class="mobile-info-row">
+                    <div class="mobile-info-label">
+                        <i class="bi bi-clock"></i>
+                        Dias restantes
+                    </div>
+                    <div class="mobile-info-value {{ 'success' if client.days_until_expiration > 3 else 'warning' if client.days_until_expiration >= 0 else 'danger' }}">
+                        {% if client.days_until_expiration >= 0 %}
+                            {{ client.days_until_expiration }} dias
+                        {% else %}
+                            {{ client.days_until_expiration|abs }} dias em atraso
+                        {% endif %}
+                    </div>
+                </div>
+                <div class="mobile-info-row">
+                    <div class="mobile-info-label">
+                        <i class="bi bi-credit-card"></i>
+                        Pagamento
+                    </div>
+                    <div class="mobile-info-value">
+                        {% if current_status == 'paid' %}
+                            <span class="mobile-payment-status paid">
+                                <i class="bi bi-check2"></i>Pago
+                            </span>
+                        {% else %}
+                            <span class="mobile-payment-status pending">
+                                <i class="bi bi-clock"></i>Pendente
+                            </span>
+                        {% endif %}
+                    </div>
+                </div>
+                
+                <div class="mobile-actions-container">
+                    <button class="mobile-action-btn haptic-feedback" onclick="showRenewalModal('{{ client.id }}', '{{ client.name }}')">
+                        <i class="bi bi-arrow-clockwise"></i>
+                        Renovar
+                    </button>
+                    <button class="mobile-action-btn haptic-feedback" onclick="togglePaymentStatus('{{ client.id }}', '{{ current_status }}')">
+                        <i class="bi bi-credit-card"></i>
+                        {% if current_status == 'paid' %}Pendente{% else %}Pago{% endif %}
+                    </button>
+                    <a href="{{ url_for('edit_client', client_id=client.id) }}" class="mobile-action-btn haptic-feedback">
+                        <i class="bi bi-pencil"></i>
+                        Editar
+                    </a>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+
+{% else %}
+<!-- Desktop Empty State -->
+<div class="d-none d-md-block">
+    <div class="row">
+        <div class="col-12">
+            <div class="card border-0 shadow-sm">
+                <div class="card-body text-center py-5">
+                    <div class="text-muted mb-4">
+                        <i class="bi bi-people fs-1"></i>
+                    </div>
+                    <h3 class="text-muted mb-3">Nenhum cliente cadastrado</h3>
+                    <p class="text-muted mb-4">Comece adicionando seu primeiro cliente para gerenciar planos e pagamentos</p>
+                    <a href="{{ url_for('add_client') }}" class="btn btn-primary btn-lg">
+                        <i class="bi bi-person-plus me-2"></i>
+                        Adicionar Primeiro Cliente
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Mobile Empty State -->
+<div class="d-md-none mobile-empty-state">
+    <div class="empty-icon">
+        <i class="bi bi-people"></i>
+    </div>
+    <h3>Nenhum cliente cadastrado</h3>
+    <p>Comece adicionando seu primeiro cliente para gerenciar planos e pagamentos de forma simples e eficiente.</p>
+    <a href="{{ url_for('add_client') }}" class="btn btn-primary btn-lg">
+        <i class="bi bi-person-plus me-2"></i>
+        Adicionar Cliente
+    </a>
+</div>
 {% endif %}
+
+<!-- Floating Action Button (Mobile) -->
+<a href="{{ url_for('add_client') }}" class="fab d-md-none">
+    <i class="bi bi-plus"></i>
+</a>
+
+<!-- Renewal Modal -->
+<div class="modal fade" id="renewalModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="bi bi-arrow-clockwise me-2"></i>Renovar Plano
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form id="renewalForm" method="POST">
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Cliente:</label>
+                        <p class="fw-bold" id="renewalClientName"></p>
+                    </div>
+                    <div class="mb-3">
+                        <label for="renewal_days" class="form-label">Renovar por quantos dias:</label>
+                        <select class="form-select" name="renewal_days" id="renewal_days" required>
+                            <option value="15">15 dias</option>
+                            <option value="30" selected>30 dias (1 mês)</option>
+                            <option value="60">60 dias (2 meses)</option>
+                            <option value="90">90 dias (3 meses)</option>
+                            <option value="180">180 dias (6 meses)</option>
+                            <option value="365">365 dias (1 ano)</option>
+                            <option value="custom">Personalizado</option>
+                        </select>
+                    </div>
+                    <div class="mb-3" id="customDaysInput" style="display: none;">
+                        <label for="custom_days" class="form-label">Dias personalizados:</label>
+                        <input type="number" class="form-control" id="custom_days" min="1" max="999">
+                    </div>
+                    <div class="mb-3">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" name="mark_as_paid" id="mark_as_paid">
+                            <label class="form-check-label" for="mark_as_paid">
+                                <strong>Já foi pago</strong> (não enviar cobrança)
+                            </label>
+                        </div>
+                        <small class="text-muted">Marque esta opção se o pagamento já foi recebido</small>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="bi bi-check2 me-1"></i>Renovar Plano
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
 
 <!-- Delete Confirmation Modal -->
 <div class="modal fade" id="deleteModal" tabindex="-1">
     <div class="modal-dialog">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title">Confirmar Exclusão</h5>
+                <h5 class="modal-title">
+                    <i class="bi bi-exclamation-triangle text-danger me-2"></i>Confirmar Exclusão
+                </h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body">
                 <p>Tem certeza que deseja excluir o cliente <strong id="clientName"></strong>?</p>
-                <p class="text-danger">Esta ação não pode ser desfeita.</p>
+                <div class="alert alert-danger">
+                    <i class="bi bi-exclamation-triangle me-2"></i>
+                    Esta ação não pode ser desfeita e todos os dados do cliente serão perdidos.
+                </div>
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
                 <form id="deleteForm" method="POST" style="display: inline;">
-                    <button type="submit" class="btn btn-danger">Excluir</button>
+                    <button type="submit" class="btn btn-danger">
+                        <i class="bi bi-trash me-1"></i>Excluir
+                    </button>
                 </form>
             </div>
         </div>
     </div>
 </div>
+
+<!-- Payment Status Form (Hidden) -->
+<form id="paymentStatusForm" method="POST" style="display: none;">
+    <input type="hidden" name="status" id="paymentStatus">
+</form>
 {% endblock %}
 
 {% block scripts %}

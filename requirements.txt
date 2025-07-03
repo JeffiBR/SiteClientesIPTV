@@ -1,0 +1,27 @@
+Flask==2.3.3
+Werkzeug==2.3.7
+APScheduler==3.10.4
+requests==2.31.0
+python-dateutil==2.8.2
+pytz==2023.3
+Jinja2==3.1.2
+MarkupSafe==2.1.3
+itsdangerous==2.1.2
+click==8.1.7
+blinker==1.6.3
+
+# Melhorias implementadas - dependências opcionais
+# Se não tiver psutil, funciona sem monitoramento de sistema
+psutil>=5.9.0
+
+# Para logs estruturados (opcional)
+# structlog>=23.1.0
+
+# Para cache distribuído futuro (opcional)
+# redis>=4.5.0
+
+# Para validação avançada futuro (opcional)
+# marshmallow>=3.19.0
+
+# Para sanitização de dados futuro (opcional)
+# bleach>=6.0.0
