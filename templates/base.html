@@ -23,7 +23,8 @@
         <div class="container-fluid">
             <a class="navbar-brand" href="{{ url_for('dashboard') }}">
                 <i class="bi bi-robot"></i>
-                Bot Cliente Manager
+                <span class="d-none d-sm-inline">Bot Cliente Manager</span>
+                <span class="d-sm-none">BCM</span>
             </a>
             
             <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
@@ -33,33 +34,27 @@
             <div class="collapse navbar-collapse" id="navbarNav">
                 <ul class="navbar-nav me-auto">
                     <li class="nav-item">
-                        <a class="nav-link" href="{{ url_for('dashboard') }}">
+                        <a class="nav-link {{ 'active' if request.endpoint == 'dashboard' }}" href="{{ url_for('dashboard') }}">
                             <i class="bi bi-speedometer2"></i> 
-                            <span class="d-none d-md-inline">Dashboard</span>
+                            <span>Dashboard</span>
                         </a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link" href="{{ url_for('clients') }}">
+                        <a class="nav-link {{ 'active' if request.endpoint == 'clients' }}" href="{{ url_for('clients') }}">
                             <i class="bi bi-people"></i> 
-                            <span class="d-none d-md-inline">Clientes</span>
+                            <span>Clientes</span>
                         </a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link" href="{{ url_for('messages') }}">
+                        <a class="nav-link {{ 'active' if request.endpoint == 'messages' }}" href="{{ url_for('messages') }}">
                             <i class="bi bi-chat-text"></i> 
-                            <span class="d-none d-md-inline">Mensagens</span>
+                            <span>Mensagens</span>
                         </a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link" href="{{ url_for('whatsapp') }}">
+                        <a class="nav-link {{ 'active' if request.endpoint == 'whatsapp' }}" href="{{ url_for('whatsapp') }}">
                             <i class="bi bi-whatsapp"></i> 
-                            <span class="d-none d-md-inline">WhatsApp</span>
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="{{ url_for('vpn_dashboard') }}">
-                            <i class="bi bi-shield-lock"></i> 
-                            <span class="d-none d-md-inline">VPN Dashboard</span>
+                            <span>WhatsApp</span>
                         </a>
                     </li>
                 </ul>
@@ -82,7 +77,8 @@
         {% with messages = get_flashed_messages(with_categories=true) %}
             {% if messages %}
                 {% for category, message in messages %}
-                    <div class="alert alert-{{ 'danger' if category == 'error' else category }} alert-dismissible fade show" role="alert">
+                    <div class="alert alert-{{ 'danger' if category == 'error' else category }} alert-dismissible fade show animate-slideInUp" role="alert">
+                        <i class="bi bi-{{ 'exclamation-triangle' if category == 'error' else ('check-circle' if category == 'success' else 'info-circle') }}"></i>
                         {{ message }}
                         <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
                     </div>
@@ -126,6 +122,28 @@
                 themeToggle.title = 'Alternar para modo escuro';
             }
         }
+
+        // Active nav link highlighting
+        document.addEventListener('DOMContentLoaded', function() {
+            const currentPath = window.location.pathname;
+            const navLinks = document.querySelectorAll('.navbar-nav .nav-link');
+            
+            navLinks.forEach(link => {
+                if (link.getAttribute('href') === currentPath) {
+                    link.classList.add('active');
+                }
+            });
+        });
+
+        // Auto-hide alerts after 5 seconds
+        document.querySelectorAll('.alert').forEach(alert => {
+            setTimeout(() => {
+                if (alert) {
+                    const bsAlert = new bootstrap.Alert(alert);
+                    bsAlert.close();
+                }
+            }, 5000);
+        });
     </script>
     
     <!-- Custom JS -->
