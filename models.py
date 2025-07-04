@@ -7,11 +7,11 @@ class Client:
                  reminder_time_payment: str = "10:00", custom_message_3days: str = "", 
                  custom_message_payment: str = "", created_at: Optional[str] = None,
                  payment_status: str = "pending", last_renewal_date: Optional[str] = None,
-                 renewal_days: int = 0):
+                 renewal_days: int = 0, observations: str = "", renewal_history: List = None):
         self.id = id
         self.name = name
         self.phone = phone  # Obrigatório agora
-        self.plan_type = plan_type  # 'IPTV' or 'VPN'
+        self.plan_type = plan_type  # 'IPTV', 'VPN', 'STREAMING', 'GAMING', 'INTERNET', 'OUTROS'
         self.value = value
         self.plan_duration = plan_duration  # Data de duração do plano (YYYY-MM-DD)
         self.reminder_time_3days = reminder_time_3days  # Format: "HH:MM"
@@ -22,6 +22,8 @@ class Client:
         self.payment_status = payment_status  # 'pending', 'paid', 'overdue'
         self.last_renewal_date = last_renewal_date
         self.renewal_days = renewal_days
+        self.observations = observations  # Campo para observações/notas sobre o cliente
+        self.renewal_history = renewal_history or []  # Histórico de renovações
     
     @property
     def payment_day(self) -> int:
@@ -60,25 +62,53 @@ class Client:
             return "ativo"
     
     @property
+    def status_color(self) -> str:
+        """Retorna a cor baseada no status para UI"""
+        days = self.days_until_expiration
+        if days < 0:
+            return "danger"  # Vermelho
+        elif days <= 3:
+            return "warning"  # Amarelo
+        elif days <= 7:
+            return "info"  # Azul
+        else:
+            return "success"  # Verde
+    
+    @property
     def should_send_reminder(self) -> bool:
         """Verifica se deve enviar lembrete baseado no status de pagamento"""
-        return self.payment_status != "paid"
+        return self.payment_status != "paid" and not self.is_expired
     
     def renew_plan(self, days: int) -> bool:
-        """Renova o plano por X dias"""
+        """Renova o plano por X dias e registra no histórico"""
         try:
             current_date = datetime.strptime(self.plan_duration, '%Y-%m-%d').date()
+            
             # Se o plano já expirou, renova a partir de hoje
             if current_date < date.today():
                 new_date = date.today() + timedelta(days=days)
             else:
                 new_date = current_date + timedelta(days=days)
             
+            # Registrar no histórico de renovações
+            renewal_record = {
+                'date': datetime.now().isoformat(),
+                'days_added': days,
+                'previous_expiration': self.plan_duration,
+                'new_expiration': new_date.strftime('%Y-%m-%d'),
+                'value': self.value
+            }
+            
+            # Atualizar dados do cliente
             self.plan_duration = new_date.strftime('%Y-%m-%d')
             self.last_renewal_date = datetime.now().isoformat()
             self.renewal_days = days
+            self.payment_status = "paid"  # Marcar como pago ao renovar
+            self.renewal_history.append(renewal_record)
+            
             return True
-        except:
+        except Exception as e:
+            print(f"Erro ao renovar plano: {e}")
             return False
     
     def mark_as_paid(self):
@@ -88,6 +118,32 @@ class Client:
     def mark_as_pending(self):
         """Marca como pendente"""
         self.payment_status = "pending"
+    
+    def mark_as_overdue(self):
+        """Marca como em atraso"""
+        self.payment_status = "overdue"
+    
+    def add_observation(self, observation: str):
+        """Adiciona uma observação com timestamp"""
+        timestamp = datetime.now().strftime('%d/%m/%Y %H:%M')
+        if self.observations:
+            self.observations += f"\n[{timestamp}] {observation}"
+        else:
+            self.observations = f"[{timestamp}] {observation}"
+    
+    def get_renewal_summary(self) -> Dict:
+        """Retorna resumo das renovações"""
+        total_renewals = len(self.renewal_history)
+        total_days_renewed = sum(r.get('days_added', 0) for r in self.renewal_history)
+        total_revenue = sum(r.get('value', 0) for r in self.renewal_history)
+        
+        return {
+            'total_renewals': total_renewals,
+            'total_days_renewed': total_days_renewed,
+            'total_revenue': total_revenue,
+            'last_renewal': self.last_renewal_date,
+            'history': self.renewal_history
+        }
     
     def to_dict(self) -> Dict:
         return {
@@ -104,7 +160,9 @@ class Client:
             'created_at': self.created_at,
             'payment_status': getattr(self, 'payment_status', 'pending'),
             'last_renewal_date': getattr(self, 'last_renewal_date', None),
-            'renewal_days': getattr(self, 'renewal_days', 0)
+            'renewal_days': getattr(self, 'renewal_days', 0),
+            'observations': getattr(self, 'observations', ''),
+            'renewal_history': getattr(self, 'renewal_history', [])
         }
     
     @classmethod

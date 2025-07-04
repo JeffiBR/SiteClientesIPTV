@@ -288,10 +288,18 @@
                                                     </a>
                                                 </li>
                                                 <li>
-                                                    <button class="dropdown-item" onclick="showRenewalModal('{{ client.id }}', '{{ client.name }}')">
-                                                        <i class="bi bi-arrow-clockwise me-2"></i>Renovar
+                                                    <button class="dropdown-item" onclick="showRenewalModal('{{ client.id }}', '{{ client.name }}', '{{ client.plan_type }}', {{ client.value }})">
+                                                        <i class="bi bi-arrow-clockwise me-2"></i>Renovar Plano
                                                     </button>
                                                 </li>
+                                                <li>
+                                                    <button class="dropdown-item" onclick="showObservationsModal('{{ client.id }}', '{{ client.name }}')" 
+                                                            data-observations="{{ client.observations or '' }}">
+                                                        <i class="bi bi-journal-text me-2"></i>
+                                                        {% if client.observations %}Ver Observações{% else %}Adicionar Observação{% endif %}
+                                                    </button>
+                                                </li>
+                                                <li><hr class="dropdown-divider"></li>
                                                 <li>
                                                     <button class="dropdown-item" onclick="togglePaymentStatus('{{ client.id }}', '{{ current_status }}')">
                                                         <i class="bi bi-credit-card me-2"></i>
@@ -395,9 +403,15 @@
                 </div>
                 
                 <div class="mobile-actions-container">
-                    <button class="mobile-action-btn haptic-feedback" onclick="showRenewalModal('{{ client.id }}', '{{ client.name }}')">
+                    <button class="mobile-action-btn haptic-feedback" onclick="showRenewalModal('{{ client.id }}', '{{ client.name }}')" 
+                            data-plan="{{ client.plan_type }}" data-value="{{ client.value }}">
                         <i class="bi bi-arrow-clockwise"></i>
                         Renovar
+                    </button>
+                    <button class="mobile-action-btn haptic-feedback" onclick="showObservationsModal('{{ client.id }}', '{{ client.name }}')" 
+                            data-observations="{{ client.observations or '' }}">
+                        <i class="bi bi-journal-text"></i>
+                        {% if client.observations %}Observações{% else %}Anotar{% endif %}
                     </button>
                     <button class="mobile-action-btn haptic-feedback" onclick="togglePaymentStatus('{{ client.id }}', '{{ current_status }}')">
                         <i class="bi bi-credit-card"></i>
@@ -457,50 +471,180 @@
 
 <!-- Renewal Modal -->
 <div class="modal fade" id="renewalModal" tabindex="-1">
-    <div class="modal-dialog">
+    <div class="modal-dialog modal-lg">
         <div class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title">
-                    <i class="bi bi-arrow-clockwise me-2"></i>Renovar Plano
+                    <i class="bi bi-arrow-clockwise me-2 text-primary"></i>Renovar Plano
                 </h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <form id="renewalForm" method="POST">
                 <div class="modal-body">
-                    <div class="mb-3">
-                        <label class="form-label">Cliente:</label>
-                        <p class="fw-bold" id="renewalClientName"></p>
-                    </div>
-                    <div class="mb-3">
-                        <label for="renewal_days" class="form-label">Renovar por quantos dias:</label>
-                        <select class="form-select" name="renewal_days" id="renewal_days" required>
-                            <option value="15">15 dias</option>
-                            <option value="30" selected>30 dias (1 mês)</option>
-                            <option value="60">60 dias (2 meses)</option>
-                            <option value="90">90 dias (3 meses)</option>
-                            <option value="180">180 dias (6 meses)</option>
-                            <option value="365">365 dias (1 ano)</option>
-                            <option value="custom">Personalizado</option>
-                        </select>
-                    </div>
-                    <div class="mb-3" id="customDaysInput" style="display: none;">
-                        <label for="custom_days" class="form-label">Dias personalizados:</label>
-                        <input type="number" class="form-control" id="custom_days" min="1" max="999">
-                    </div>
-                    <div class="mb-3">
-                        <div class="form-check">
-                            <input class="form-check-input" type="checkbox" name="mark_as_paid" id="mark_as_paid">
-                            <label class="form-check-label" for="mark_as_paid">
-                                <strong>Já foi pago</strong> (não enviar cobrança)
-                            </label>
+                    <!-- Client Info -->
+                    <div class="card mb-4">
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <label class="form-label text-muted">Cliente:</label>
+                                    <p class="fw-bold mb-0" id="renewalClientName"></p>
+                                </div>
+                                <div class="col-md-3">
+                                    <label class="form-label text-muted">Plano:</label>
+                                    <p class="fw-bold mb-0" id="renewalClientPlan"></p>
+                                </div>
+                                <div class="col-md-3">
+                                    <label class="form-label text-muted">Valor:</label>
+                                    <p class="fw-bold text-success mb-0" id="renewalClientValue"></p>
+                                </div>
+                            </div>
                         </div>
-                        <small class="text-muted">Marque esta opção se o pagamento já foi recebido</small>
+                    </div>
+
+                    <!-- Renewal Options -->
+                    <div class="mb-4">
+                        <label for="renewal_days" class="form-label">
+                            <i class="bi bi-calendar-plus me-2"></i>Período de Renovação:
+                        </label>
+                        <div class="row g-2">
+                            <div class="col-6 col-md-3">
+                                <input type="radio" class="btn-check" name="renewal_days" id="days30" value="30" checked>
+                                <label class="btn btn-outline-primary w-100" for="days30">
+                                    <div class="fw-bold">30 dias</div>
+                                    <small>1 mês</small>
+                                </label>
+                            </div>
+                            <div class="col-6 col-md-3">
+                                <input type="radio" class="btn-check" name="renewal_days" id="days60" value="60">
+                                <label class="btn btn-outline-primary w-100" for="days60">
+                                    <div class="fw-bold">60 dias</div>
+                                    <small>2 meses</small>
+                                </label>
+                            </div>
+                            <div class="col-6 col-md-3">
+                                <input type="radio" class="btn-check" name="renewal_days" id="days90" value="90">
+                                <label class="btn btn-outline-primary w-100" for="days90">
+                                    <div class="fw-bold">90 dias</div>
+                                    <small>3 meses</small>
+                                </label>
+                            </div>
+                            <div class="col-6 col-md-3">
+                                <input type="radio" class="btn-check" name="renewal_days" id="days180" value="180">
+                                <label class="btn btn-outline-primary w-100" for="days180">
+                                    <div class="fw-bold">180 dias</div>
+                                    <small>6 meses</small>
+                                </label>
+                            </div>
+                            <div class="col-6 col-md-3">
+                                <input type="radio" class="btn-check" name="renewal_days" id="days365" value="365">
+                                <label class="btn btn-outline-success w-100" for="days365">
+                                    <div class="fw-bold">365 dias</div>
+                                    <small>1 ano</small>
+                                </label>
+                            </div>
+                            <div class="col-6 col-md-3">
+                                <input type="radio" class="btn-check" name="renewal_days" id="daysCustom" value="custom">
+                                <label class="btn btn-outline-secondary w-100" for="daysCustom">
+                                    <div class="fw-bold">Personalizado</div>
+                                    <small>Definir</small>
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Custom Days Input -->
+                    <div class="mb-4" id="customDaysInput" style="display: none;">
+                        <label for="custom_days" class="form-label">Dias personalizados:</label>
+                        <div class="input-group">
+                            <input type="number" class="form-control" id="custom_days" min="1" max="999" placeholder="Digite o número de dias">
+                            <span class="input-group-text">dias</span>
+                        </div>
+                    </div>
+
+                    <!-- Payment Status -->
+                    <div class="mb-4">
+                        <div class="card border-info">
+                            <div class="card-body">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" name="mark_as_paid" id="mark_as_paid" checked>
+                                    <label class="form-check-label fw-bold" for="mark_as_paid">
+                                        <i class="bi bi-check-circle text-success me-2"></i>Marcar como pago
+                                    </label>
+                                </div>
+                                <small class="text-muted">
+                                    <i class="bi bi-info-circle me-1"></i>
+                                    Quando marcado, o cliente não receberá lembretes de cobrança
+                                </small>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Renewal Preview -->
+                    <div class="alert alert-info" id="renewalPreview">
+                        <i class="bi bi-calendar-check me-2"></i>
+                        <span id="renewalPreviewText">O plano será renovado por 30 dias</span>
                     </div>
                 </div>
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                        <i class="bi bi-x-circle me-1"></i>Cancelar
+                    </button>
+                    <button type="submit" class="btn btn-success btn-lg">
+                        <i class="bi bi-arrow-clockwise me-1"></i>Renovar Plano
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Observations Modal -->
+<div class="modal fade" id="observationsModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="bi bi-journal-text me-2 text-info"></i>Observações do Cliente
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form id="observationsForm" method="POST">
+                <div class="modal-body">
+                    <!-- Client Info -->
+                    <div class="mb-3">
+                        <label class="form-label text-muted">Cliente:</label>
+                        <p class="fw-bold" id="observationsClientName"></p>
+                    </div>
+
+                    <!-- Current Observations -->
+                    <div class="mb-3" id="currentObservations" style="display: none;">
+                        <label class="form-label">Observações Existentes:</label>
+                        <div class="card">
+                            <div class="card-body">
+                                <pre id="currentObservationsText" class="mb-0 text-wrap"></pre>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Add New Observation -->
+                    <div class="mb-3">
+                        <label for="new_observation" class="form-label">
+                            <i class="bi bi-plus-circle me-2"></i>Nova Observação:
+                        </label>
+                        <textarea class="form-control" id="new_observation" name="new_observation" rows="4" 
+                                  placeholder="Digite uma nova observação sobre este cliente..."></textarea>
+                        <div class="form-text">
+                            <i class="bi bi-info-circle me-1"></i>
+                            A observação será automaticamente marcada com data e hora
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                        <i class="bi bi-x-circle me-1"></i>Cancelar
+                    </button>
                     <button type="submit" class="btn btn-primary">
-                        <i class="bi bi-check2 me-1"></i>Renovar Plano
+                        <i class="bi bi-save me-1"></i>Salvar Observação
                     </button>
                 </div>
             </form>

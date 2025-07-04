@@ -21,45 +21,124 @@ function confirmDelete(clientId, clientName) {
 }
 
 // Renewal modal functionality
-function showRenewalModal(clientId, clientName) {
+function showRenewalModal(clientId, clientName, clientPlan = '', clientValue = 0) {
     const modal = new bootstrap.Modal(document.getElementById('renewalModal'));
     const clientNameElement = document.getElementById('renewalClientName');
+    const clientPlanElement = document.getElementById('renewalClientPlan');
+    const clientValueElement = document.getElementById('renewalClientValue');
     const renewalForm = document.getElementById('renewalForm');
-    const renewalDaysSelect = document.getElementById('renewal_days');
     const customDaysInput = document.getElementById('customDaysInput');
     const customDaysField = document.getElementById('custom_days');
+    const renewalPreviewText = document.getElementById('renewalPreviewText');
+
+    // Get plan and value from data attributes if not provided
+    const button = event.target.closest('button');
+    if (button) {
+        clientPlan = button.dataset.plan || clientPlan;
+        clientValue = button.dataset.value || clientValue;
+    }
+
+    // Set client info
+    clientNameElement.textContent = clientName;
+    clientPlanElement.textContent = clientPlan || 'N/A';
+    clientValueElement.textContent = clientValue ? `R$ ${parseFloat(clientValue).toFixed(2)}` : 'R$ 0,00';
+    
+    // Set form action
+    renewalForm.action = `/clients/renew/${clientId}`;
+
+    // Handle renewal days selection
+    const renewalDaysRadios = document.querySelectorAll('input[name="renewal_days"]');
+    renewalDaysRadios.forEach(radio => {
+        radio.addEventListener('change', function() {
+            if (this.value === 'custom') {
+                customDaysInput.style.display = 'block';
+                customDaysField.required = true;
+                customDaysField.focus();
+            } else {
+                customDaysInput.style.display = 'none';
+                customDaysField.required = false;
+                updateRenewalPreview(this.value);
+            }
+        });
+    });
+
+    // Handle custom days input
+    customDaysField.addEventListener('input', function() {
+        if (this.value && this.value > 0) {
+            updateRenewalPreview(this.value);
+        }
+    });
+
+    // Form submission handling
+    renewalForm.onsubmit = function(e) {
+        const customRadio = document.getElementById('daysCustom');
+        if (customRadio.checked) {
+            if (!customDaysField.value || customDaysField.value <= 0) {
+                e.preventDefault();
+                alert('Por favor, insira um número válido de dias');
+                return false;
+            }
+            // Set the custom value as the renewal_days value
+            customRadio.value = customDaysField.value;
+        }
+    };
+
+    // Initial preview
+    updateRenewalPreview(30);
+
+    // Show modal
+    modal.show();
+}
+
+// Update renewal preview
+function updateRenewalPreview(days) {
+    const renewalPreviewText = document.getElementById('renewalPreviewText');
+    if (renewalPreviewText) {
+        const today = new Date();
+        const futureDate = new Date(today.getTime() + (days * 24 * 60 * 60 * 1000));
+        const formattedDate = futureDate.toLocaleDateString('pt-BR');
+        
+        let period = '';
+        if (days == 30) period = ' (1 mês)';
+        else if (days == 60) period = ' (2 meses)';
+        else if (days == 90) period = ' (3 meses)';
+        else if (days == 180) period = ' (6 meses)';
+        else if (days == 365) period = ' (1 ano)';
+        
+        renewalPreviewText.textContent = `O plano será renovado por ${days} dias${period} até ${formattedDate}`;
+    }
+}
+
+// Observations modal functionality
+function showObservationsModal(clientId, clientName) {
+    const modal = new bootstrap.Modal(document.getElementById('observationsModal'));
+    const clientNameElement = document.getElementById('observationsClientName');
+    const currentObservations = document.getElementById('currentObservations');
+    const currentObservationsText = document.getElementById('currentObservationsText');
+    const observationsForm = document.getElementById('observationsForm');
+    const newObservationField = document.getElementById('new_observation');
+
+    // Get observations from data attribute
+    const button = event.target.closest('button');
+    const observations = button ? button.dataset.observations : '';
 
     // Set client name
     clientNameElement.textContent = clientName;
     
     // Set form action
-    renewalForm.action = `/clients/renew/${clientId}`;
+    observationsForm.action = `/clients/observations/${clientId}`;
 
-    // Handle custom days option
-    renewalDaysSelect.addEventListener('change', function() {
-        if (this.value === 'custom') {
-            customDaysInput.style.display = 'block';
-            customDaysField.required = true;
-            // Update form submission to use custom value
-            renewalForm.addEventListener('submit', function(e) {
-                if (renewalDaysSelect.value === 'custom') {
-                    // Create a hidden input with the custom value
-                    const hiddenInput = document.createElement('input');
-                    hiddenInput.type = 'hidden';
-                    hiddenInput.name = 'renewal_days';
-                    hiddenInput.value = customDaysField.value;
-                    this.appendChild(hiddenInput);
-                    
-                    // Remove the select from form submission
-                    renewalDaysSelect.disabled = true;
-                }
-            });
-        } else {
-            customDaysInput.style.display = 'none';
-            customDaysField.required = false;
-            renewalDaysSelect.disabled = false;
-        }
-    });
+    // Show/hide current observations
+    if (observations && observations.trim()) {
+        currentObservations.style.display = 'block';
+        currentObservationsText.textContent = observations;
+    } else {
+        currentObservations.style.display = 'none';
+    }
+
+    // Clear new observation field
+    newObservationField.value = '';
+    newObservationField.focus();
 
     // Show modal
     modal.show();

@@ -186,11 +186,19 @@ def edit_client(client_id):
             client.custom_message_3days = request.form.get('custom_message_3days', '')
             client.custom_message_payment = request.form.get('custom_message_payment', '')
             
+            # Handle new observation if provided
+            new_observation = request.form.get('new_observation', '').strip()
+            if new_observation:
+                client.add_observation(new_observation)
+            
             # Save to GitHub
             if storage.update_client(client):
                 # Update scheduler
                 setup_reminders(scheduler)
-                flash('Cliente atualizado com sucesso!', 'success')
+                success_msg = 'Cliente atualizado com sucesso!'
+                if new_observation:
+                    success_msg += ' Nova observação adicionada.'
+                flash(success_msg, 'success')
                 return redirect(url_for('clients'))
             else:
                 flash('Erro ao atualizar cliente no GitHub', 'error')
@@ -314,6 +322,52 @@ def renew_client(client_id):
         app_logger.log_error(e, context="client_renewal", 
                            user_ip=client_ip, client_id=client_id)
         flash(f'Erro ao renovar cliente: {str(e)}', 'error')
+
+    return redirect(url_for('clients'))
+
+@app.route('/clients/observations/<client_id>', methods=['POST'])
+def update_client_observations(client_id):
+    """Update client observations"""
+    client_ip = get_client_ip()
+    
+    # Rate limiting for form action
+    if not rate_limit_form(limit=10).is_allowed(client_ip):
+        flash('Muitas tentativas. Aguarde.', 'error')
+        return redirect(url_for('clients'))
+    
+    try:
+        client = storage.get_client_by_id(client_id)
+        if not client:
+            flash('Cliente não encontrado', 'error')
+            return redirect(url_for('clients'))
+        
+        new_observation = request.form.get('new_observation', '').strip()
+        if not new_observation:
+            flash('Observação não pode estar vazia', 'error')
+            return redirect(url_for('clients'))
+        
+        # Add the new observation with timestamp
+        client.add_observation(new_observation)
+        
+        # Save to GitHub
+        if storage.update_client(client):
+            # Log observation update
+            client_logger.log_client_action(
+                "observation_added",
+                client.id,
+                client.name,
+                user_ip=client_ip,
+                observation_preview=new_observation[:50] + "..." if len(new_observation) > 50 else new_observation
+            )
+            
+            flash('Observação adicionada com sucesso!', 'success')
+        else:
+            flash('Erro ao salvar observação no GitHub', 'error')
+            
+    except Exception as e:
+        app_logger.log_error(e, context="client_observations", 
+                           user_ip=client_ip, client_id=client_id)
+        flash(f'Erro ao adicionar observação: {str(e)}', 'error')
 
     return redirect(url_for('clients'))
 
