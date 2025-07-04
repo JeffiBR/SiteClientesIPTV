@@ -1,4 +1,4 @@
-THIS SHOULD BE A LINTER ERRORfrom flask import render_template, request, redirect, url_for, flash, jsonify
+from flask import render_template, request, redirect, url_for, flash, jsonify
 from app import app, scheduler
 import uuid
 from datetime import datetime
@@ -211,7 +211,14 @@ def edit_client(client_id):
             else:
                 flash('Erro ao atualizar cliente no GitHub', 'error')
         
-        return render_template('edit_client.html', client=client)
+        # Load message templates for the form
+        try:
+            message_templates = storage.get_message_templates()
+        except Exception as e:
+            logger.error(f"Error loading message templates: {str(e)}")
+            message_templates = []
+        
+        return render_template('edit_client.html', client=client, message_templates=message_templates)
         
     except Exception as e:
         logger.error(f"Error editing client: {str(e)}")
