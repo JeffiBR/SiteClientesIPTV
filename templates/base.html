@@ -52,6 +52,12 @@
                         </a>
                     </li>
                     <li class="nav-item">
+                        <a class="nav-link {{ 'active' if request.endpoint == 'ai_config' }}" href="{{ url_for('ai_config') }}">
+                            <i class="bi bi-robot"></i> 
+                            <span>Config IA</span>
+                        </a>
+                    </li>
+                    <li class="nav-item">
                         <a class="nav-link {{ 'active' if request.endpoint == 'whatsapp' }}" href="{{ url_for('whatsapp') }}">
                             <i class="bi bi-whatsapp"></i> 
                             <span>WhatsApp</span>

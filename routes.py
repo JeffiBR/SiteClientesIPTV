@@ -1,4 +1,4 @@
-THIS SHOULD BE A LINTER ERRORfrom flask import render_template, request, redirect, url_for, flash, jsonify
+from flask import render_template, request, redirect, url_for, flash, jsonify
 from app import app, scheduler
 import uuid
 from datetime import datetime
@@ -481,6 +481,125 @@ def whatsapp_disconnect():
     disconnect_whatsapp()
     flash('WhatsApp desconectado', 'info')
     return redirect(url_for('whatsapp'))
+
+@app.route('/ai/config', methods=['GET', 'POST'])
+def ai_config():
+    """AI Configuration page"""
+    try:
+        if request.method == 'POST':
+            # Save AI configuration
+            ai_config_data = {
+                'provider': request.form.get('provider', 'openrouter'),
+                'api_key': request.form.get('api_key', ''),
+                'model': request.form.get('model', 'qwen/qwen-2.5-72b-instruct:free'),
+                'base_url': request.form.get('base_url', ''),
+                'max_tokens': int(request.form.get('max_tokens', 200)),
+                'temperature': float(request.form.get('temperature', 0.7)),
+                'personality': request.form.get('personality', 'professional'),
+                'custom_personality': request.form.get('custom_personality', ''),
+                'message_style': request.form.get('message_style', 'friendly'),
+                'include_emojis': 'include_emojis' in request.form,
+                'max_message_length': int(request.form.get('max_message_length', 150)),
+                'language': request.form.get('language', 'pt-BR'),
+                'custom_instructions': request.form.get('custom_instructions', ''),
+                'enabled': 'enabled' in request.form,
+                'fallback_to_templates': 'fallback_to_templates' in request.form,
+                'updated_at': datetime.now().isoformat()
+            }
+            
+            if storage.save_ai_configuration(ai_config_data):
+                flash('Configurações de IA salvas com sucesso!', 'success')
+                # Reload AI configuration
+                ai_generator = AIMessageGenerator()
+                ai_generator.load_configuration()
+            else:
+                flash('Erro ao salvar configurações no GitHub', 'error')
+            
+            return redirect(url_for('ai_config'))
+        
+        # Load current configuration
+        config_dict = storage.get_ai_configuration()
+        
+        # Get AI statistics (mock for now)
+        ai_stats = {
+            'messages_generated': 0,
+            'success_rate': '0%'
+        }
+        
+        return render_template('ai_config.html', config=config_dict, ai_stats=ai_stats)
+        
+    except Exception as e:
+        logger.error(f"Error in AI config: {str(e)}")
+        flash('Erro ao carregar configurações de IA', 'error')
+        return redirect(url_for('dashboard'))
+
+@app.route('/ai/test-connection', methods=['POST'])
+def ai_test_connection():
+    """Test AI connection"""
+    try:
+        # Get form data
+        config_data = {
+            'provider': request.form.get('provider', 'openrouter'),
+            'api_key': request.form.get('api_key', ''),
+            'model': request.form.get('model', 'qwen/qwen-2.5-72b-instruct:free'),
+            'base_url': request.form.get('base_url', ''),
+            'max_tokens': int(request.form.get('max_tokens', 200)),
+            'temperature': float(request.form.get('temperature', 0.7)),
+        }
+        
+        # Create temporary AI generator
+        ai_generator = AIMessageGenerator()
+        
+        # Test connection with sample message
+        test_response = ai_generator.test_connection(config_data)
+        
+        if test_response['success']:
+            return jsonify({
+                'success': True,
+                'response': test_response['response']
+            })
+        else:
+            return jsonify({
+                'success': False,
+                'error': test_response['error']
+            })
+            
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        })
+
+@app.route('/ai/generate-preview', methods=['POST'])
+def ai_generate_preview():
+    """Generate preview message for AI config"""
+    try:
+        category = request.form.get('category', 'IPTV')
+        
+        # Sample client data for preview
+        sample_client = {
+            'name': 'João Silva',
+            'plan_type': category,
+            'value': 25.00,
+            'days_remaining': 3
+        }
+        
+        ai_generator = AIMessageGenerator()
+        message = ai_generator.generate_message_for_category(
+            client_data=sample_client,
+            message_type='3days'
+        )
+        
+        return jsonify({
+            'success': True,
+            'message': message
+        })
+        
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        })
 
 @app.route('/api/dashboard-data')
 def api_dashboard_data():

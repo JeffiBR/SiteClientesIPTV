@@ -25,6 +25,247 @@ class AIMessageGenerator:
             from models import DEFAULT_AI_CONFIG
             self.config = AIConfiguration.from_dict(DEFAULT_AI_CONFIG)
     
+    def test_connection(self, config_data: Dict) -> Dict:
+        """Testa a conexão com o provedor de IA"""
+        try:
+            test_message = "Responda apenas 'Teste realizado com sucesso' para confirmar a conexão."
+            
+            if config_data['provider'] == 'openrouter':
+                response = self._call_openrouter_api(config_data, test_message)
+            elif config_data['provider'] == 'openai':
+                response = self._call_openai_api(config_data, test_message)
+            elif config_data['provider'] == 'anthropic':
+                response = self._call_anthropic_api(config_data, test_message)
+            else:
+                return {'success': False, 'error': 'Provedor não suportado'}
+            
+            return {'success': True, 'response': response}
+            
+        except Exception as e:
+            logger.error(f"Error testing AI connection: {str(e)}")
+            return {'success': False, 'error': str(e)}
+    
+    def _call_openrouter_api(self, config: Dict, prompt: str) -> str:
+        """Chama a API do OpenRouter"""
+        headers = {
+            "Authorization": f"Bearer {config['api_key']}",
+            "Content-Type": "application/json",
+            "HTTP-Referer": "https://github.com/seu-usuario/cliente-manager",
+            "X-Title": "Cliente Manager Bot"
+        }
+        
+        data = {
+            "model": config['model'],
+            "messages": [
+                {
+                    "role": "user",
+                    "content": prompt
+                }
+            ],
+            "max_tokens": config.get('max_tokens', 200),
+            "temperature": config.get('temperature', 0.7)
+        }
+        
+        response = requests.post(
+            "https://openrouter.ai/api/v1/chat/completions",
+            headers=headers,
+            json=data,
+            timeout=30
+        )
+        
+        if response.status_code == 200:
+            result = response.json()
+            return result['choices'][0]['message']['content'].strip()
+        else:
+            raise Exception(f"OpenRouter API error: {response.status_code} - {response.text}")
+    
+    def _call_openai_api(self, config: Dict, prompt: str) -> str:
+        """Chama a API do OpenAI"""
+        headers = {
+            "Authorization": f"Bearer {config['api_key']}",
+            "Content-Type": "application/json"
+        }
+        
+        data = {
+            "model": config['model'],
+            "messages": [
+                {
+                    "role": "user",
+                    "content": prompt
+                }
+            ],
+            "max_tokens": config.get('max_tokens', 200),
+            "temperature": config.get('temperature', 0.7)
+        }
+        
+        response = requests.post(
+            "https://api.openai.com/v1/chat/completions",
+            headers=headers,
+            json=data,
+            timeout=30
+        )
+        
+        if response.status_code == 200:
+            result = response.json()
+            return result['choices'][0]['message']['content'].strip()
+        else:
+            raise Exception(f"OpenAI API error: {response.status_code} - {response.text}")
+    
+    def _call_anthropic_api(self, config: Dict, prompt: str) -> str:
+        """Chama a API do Anthropic"""
+        headers = {
+            "x-api-key": config['api_key'],
+            "Content-Type": "application/json",
+            "anthropic-version": "2023-06-01"
+        }
+        
+        data = {
+            "model": config['model'],
+            "max_tokens": config.get('max_tokens', 200),
+            "messages": [
+                {
+                    "role": "user",
+                    "content": prompt
+                }
+            ]
+        }
+        
+        response = requests.post(
+            "https://api.anthropic.com/v1/messages",
+            headers=headers,
+            json=data,
+            timeout=30
+        )
+        
+        if response.status_code == 200:
+            result = response.json()
+            return result['content'][0]['text'].strip()
+        else:
+            raise Exception(f"Anthropic API error: {response.status_code} - {response.text}")
+    
+    def generate_message_for_category(self, client_data: Dict, message_type: str) -> str:
+        """Gera mensagem personalizada para categoria de cliente"""
+        try:
+            if not self.config.enabled:
+                return self._get_fallback_message(client_data, message_type)
+            
+            # Construir prompt baseado na categoria e tipo
+            prompt = self._build_category_prompt(client_data, message_type)
+            
+            # Chamar API baseada no provedor
+            if self.config.provider == 'openrouter':
+                response = self._call_openrouter_api(self.config.__dict__, prompt)
+            elif self.config.provider == 'openai':
+                response = self._call_openai_api(self.config.__dict__, prompt)
+            elif self.config.provider == 'anthropic':
+                response = self._call_anthropic_api(self.config.__dict__, prompt)
+            else:
+                return self._get_fallback_message(client_data, message_type)
+            
+            # Limitar tamanho da mensagem
+            if len(response) > self.config.max_message_length:
+                response = response[:self.config.max_message_length] + "..."
+            
+            return response
+            
+        except Exception as e:
+            logger.error(f"Error generating AI message: {str(e)}")
+            if self.config.fallback_to_templates:
+                return self._get_fallback_message(client_data, message_type)
+            else:
+                return "Erro ao gerar mensagem automática."
+    
+    def _build_category_prompt(self, client_data: Dict, message_type: str) -> str:
+        """Constrói prompt específico para categoria"""
+        category = client_data.get('plan_type', 'GERAL')
+        name = client_data.get('name', 'Cliente')
+        value = client_data.get('value', 0)
+        days_remaining = client_data.get('days_remaining', 0)
+        
+        # Personalidade base
+        personality_prompts = {
+            'professional': 'Seja profissional e direto.',
+            'friendly': 'Seja amigável e caloroso.',
+            'casual': 'Use linguagem descontraída e informal.',
+            'formal': 'Use tom formal e respeitoso.',
+            'energetic': 'Seja animado e motivador.',
+            'custom': self.config.custom_personality
+        }
+        
+        personality = personality_prompts.get(self.config.personality, personality_prompts['professional'])
+        
+        # Mensagens específicas por categoria
+        category_contexts = {
+            'IPTV': 'sobre serviços de IPTV, canais de TV, qualidade de imagem e entretenimento',
+            'VPN': 'sobre VPN, segurança online, privacidade e proteção de dados',
+            'STREAMING': 'sobre streaming, filmes, séries e entretenimento digital',
+            'GAMING': 'sobre gaming, jogos online, performance e velocidade de conexão',
+            'INTERNET': 'sobre internet, conectividade e navegação',
+            'OUTROS': 'sobre o serviço contratado'
+        }
+        
+        context = category_contexts.get(category, category_contexts['OUTROS'])
+        
+        # Tipo de mensagem
+        if message_type == '3days':
+            timing = f"o plano vence em {days_remaining} dias"
+        elif message_type == 'payment':
+            timing = "o plano vence hoje"
+        else:
+            timing = "é hora de renovar"
+        
+        # Instruções personalizadas
+        custom_instructions = self.config.custom_instructions or ""
+        
+        # Emojis
+        emoji_instruction = "Use emojis adequados" if self.config.include_emojis else "Não use emojis"
+        
+        prompt = f"""
+        Você é um assistente de atendimento ao cliente especializado em {context}.
+        
+        Instruções:
+        - {personality}
+        - {emoji_instruction}
+        - Mantenha a mensagem com no máximo {self.config.max_message_length} caracteres
+        - Use linguagem {self.config.language}
+        - Estilo: {self.config.message_style}
+        {f"- Instruções específicas: {custom_instructions}" if custom_instructions else ""}
+        
+        Situação: {timing}
+        Cliente: {name}
+        Categoria do serviço: {category}
+        Valor: R$ {value:.2f}
+        
+        Crie uma mensagem personalizada de lembrete de pagamento/renovação para este cliente.
+        A mensagem deve ser específica para a categoria {category} e mencionar os benefícios do serviço.
+        """
+        
+        return prompt.strip()
+    
+    def _get_fallback_message(self, client_data: Dict, message_type: str) -> str:
+        """Mensagem padrão quando IA não está disponível"""
+        category = client_data.get('plan_type', 'GERAL')
+        name = client_data.get('name', 'Cliente')
+        value = client_data.get('value', 0)
+        days_remaining = client_data.get('days_remaining', 0)
+        
+        if message_type == '3days':
+            timing = f"vence em {days_remaining} dias"
+        else:
+            timing = "vence hoje"
+        
+        # Mensagens padrão por categoria
+        fallback_messages = {
+            'IPTV': f"📺 Olá {name}! Seu plano IPTV {timing}. Renove agora e continue aproveitando seus canais favoritos! Valor: R$ {value:.2f}",
+            'VPN': f"🔒 Olá {name}! Sua VPN {timing}. Mantenha sua segurança online renovando agora! Valor: R$ {value:.2f}",
+            'STREAMING': f"🎬 Olá {name}! Seu plano de streaming {timing}. Continue assistindo seus conteúdos favoritos! Valor: R$ {value:.2f}",
+            'GAMING': f"🎮 Olá {name}! Seu plano gaming {timing}. Mantenha sua conexão de alta performance! Valor: R$ {value:.2f}",
+            'INTERNET': f"🌐 Olá {name}! Seu plano de internet {timing}. Continue conectado com qualidade! Valor: R$ {value:.2f}",
+            'OUTROS': f"📋 Olá {name}! Seu plano {timing}. Renove agora para continuar aproveitando nossos serviços! Valor: R$ {value:.2f}"
+        }
+        
+        return fallback_messages.get(category, fallback_messages['OUTROS'])
+    
     def generate_reminder_message(self, client: Client, reminder_type: str) -> str:
         """Gera uma mensagem personalizada usando IA para o cliente"""
         try:
