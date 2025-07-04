@@ -1,4 +1,4 @@
-from flask import render_template, request, redirect, url_for, flash, jsonify
+THIS SHOULD BE A LINTER ERRORfrom flask import render_template, request, redirect, url_for, flash, jsonify
 from app import app, scheduler
 import uuid
 from datetime import datetime
@@ -164,7 +164,14 @@ def add_client():
             app_logger.log_error(e, context="client_add", user_ip=client_ip)
             flash(f'Erro ao adicionar cliente: {str(e)}', 'error')
     
-    return render_template('add_client.html')
+    # Load message templates for the form
+    try:
+        message_templates = storage.get_message_templates()
+    except Exception as e:
+        logger.error(f"Error loading message templates: {str(e)}")
+        message_templates = []
+    
+    return render_template('add_client.html', message_templates=message_templates)
 
 @app.route('/clients/edit/<client_id>', methods=['GET', 'POST'])
 def edit_client(client_id):
