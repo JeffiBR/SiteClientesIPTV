@@ -5,7 +5,7 @@ from datetime import datetime
 from github_storage import storage
 from models import Client, MessageTemplate
 from reminder_scheduler import setup_reminders, get_upcoming_reminders
-from whatsapp_integration import get_whatsapp_qr_code, is_whatsapp_connected, connect_whatsapp, disconnect_whatsapp
+from whatsapp_integration import get_whatsapp_qr_code, is_whatsapp_connected, connect_whatsapp, disconnect_whatsapp, get_whatsapp_status, configure_evolution_api, send_whatsapp_message
 
 # Importar melhorias implementadas
 from validators import ClientValidator, MessageTemplateValidator, ValidationError
@@ -495,6 +495,118 @@ def whatsapp_disconnect():
     disconnect_whatsapp()
     flash('WhatsApp desconectado', 'info')
     return redirect(url_for('whatsapp'))
+
+@app.route('/api/whatsapp/configure', methods=['POST'])
+def configure_evolution_api_route():
+    """Configure Evolution API settings"""
+    try:
+        data = request.get_json()
+        api_url = data.get('api_url', '').strip()
+        api_key = data.get('api_key', '').strip()
+        instance_name = data.get('instance_name', '').strip()
+        
+        if not api_url:
+            return jsonify({'success': False, 'error': 'URL da API é obrigatória'})
+        
+        if not instance_name:
+            return jsonify({'success': False, 'error': 'Nome da instância é obrigatório'})
+        
+        # Configure Evolution API
+        configure_evolution_api(api_url, api_key if api_key else None, instance_name)
+        
+        return jsonify({'success': True, 'message': 'Configuração salva com sucesso'})
+        
+    except Exception as e:
+        logger.error(f"Error configuring Evolution API: {str(e)}")
+        return jsonify({'success': False, 'error': str(e)})
+
+@app.route('/api/whatsapp/config', methods=['GET'])
+def get_whatsapp_config():
+    """Get current WhatsApp configuration"""
+    try:
+        status = get_whatsapp_status()
+        return jsonify({
+            'api_url': status.get('api_url', ''),
+            'api_key': status.get('api_key', ''),
+            'instance_name': status.get('instance_name', '')
+        })
+    except Exception as e:
+        logger.error(f"Error getting WhatsApp config: {str(e)}")
+        return jsonify({'error': str(e)})
+
+@app.route('/api/whatsapp/qrcode', methods=['POST'])
+def generate_whatsapp_qrcode():
+    """Generate WhatsApp QR code"""
+    try:
+        qr_code = get_whatsapp_qr_code()
+        if qr_code:
+            return jsonify({'success': True, 'qr_code': qr_code})
+        else:
+            return jsonify({'success': False, 'error': 'Erro ao gerar QR code. Verifique a configuração da API.'})
+    except Exception as e:
+        logger.error(f"Error generating QR code: {str(e)}")
+        return jsonify({'success': False, 'error': str(e)})
+
+@app.route('/api/whatsapp/status', methods=['GET'])
+def get_whatsapp_api_status():
+    """Get WhatsApp connection status"""
+    try:
+        status = get_whatsapp_status()
+        return jsonify(status)
+    except Exception as e:
+        logger.error(f"Error getting WhatsApp status: {str(e)}")
+        return jsonify({'connected': False, 'error': str(e)})
+
+@app.route('/api/whatsapp/test-connection', methods=['POST'])
+def test_evolution_api_connection():
+    """Test connection to Evolution API"""
+    try:
+        data = request.get_json()
+        api_url = data.get('api_url', '').strip()
+        
+        if not api_url:
+            return jsonify({'success': False, 'error': 'URL da API é obrigatória'})
+        
+        # Test API connection
+        import requests
+        test_url = f"{api_url.rstrip('/')}/manager/findInstances"
+        response = requests.get(test_url, timeout=10)
+        
+        if response.status_code == 200:
+            return jsonify({'success': True, 'message': 'Conexão com Evolution API estabelecida'})
+        else:
+            return jsonify({'success': False, 'error': f'API retornou status {response.status_code}'})
+            
+    except requests.exceptions.ConnectionError:
+        return jsonify({'success': False, 'error': 'Não foi possível conectar à Evolution API. Verifique se está rodando.'})
+    except requests.exceptions.Timeout:
+        return jsonify({'success': False, 'error': 'Timeout na conexão com a API'})
+    except Exception as e:
+        logger.error(f"Error testing Evolution API connection: {str(e)}")
+        return jsonify({'success': False, 'error': str(e)})
+
+@app.route('/api/whatsapp/send-test', methods=['POST'])
+def send_test_whatsapp_message():
+    """Send test WhatsApp message"""
+    try:
+        data = request.get_json()
+        phone = data.get('phone', '').strip()
+        message = data.get('message', '').strip()
+        
+        if not phone or not message:
+            return jsonify({'success': False, 'error': 'Telefone e mensagem são obrigatórios'})
+        
+        # Send test message
+        success = send_whatsapp_message(phone, message)
+        
+        if success:
+            return jsonify({'success': True, 'message': 'Mensagem enviada com sucesso'})
+        else:
+            return jsonify({'success': False, 'error': 'Falha ao enviar mensagem'})
+            
+    except Exception as e:
+        logger.error(f"Error sending test message: {str(e)}")
+        return jsonify({'success': False, 'error': str(e)})
 
 @app.route('/reports')
 def reports():

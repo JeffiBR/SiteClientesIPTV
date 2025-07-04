@@ -1,28 +1,73 @@
 {% extends "base.html" %}
 
-{% block title %}WhatsApp - Bot Cliente Manager{% endblock %}
+{% block title %}WhatsApp Evolution API - Bot Cliente Manager{% endblock %}
 
 {% block content %}
 <div class="row">
     <div class="col-12">
         <h1 class="mb-4">
-            <i class="bi bi-whatsapp"></i>
-            Conexão WhatsApp
+            <i class="bi bi-whatsapp text-success"></i>
+            WhatsApp Evolution API
         </h1>
     </div>
 </div>
 
-<!-- Demo Mode Alert -->
+<!-- Evolution API Info Banner -->
 <div class="row mb-4">
     <div class="col-12">
-        <div class="alert alert-info border-0" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white;">
+        <div class="alert alert-success border-0" style="background: linear-gradient(135deg, #25d366 0%, #128c7e 100%); color: white;">
             <div class="d-flex align-items-center">
-                <i class="bi bi-info-circle fs-3 me-3"></i>
+                <i class="bi bi-rocket-takeoff fs-3 me-3"></i>
                 <div>
-                    <h5 class="mb-1">🚀 MODO DEMONSTRAÇÃO ATIVO</h5>
-                    <p class="mb-2">Este sistema está rodando em modo demo para fins de desenvolvimento e teste. O QR code abaixo contém informações sobre integração real com WhatsApp.</p>
-                    <small><strong>Para produção:</strong> Configure WhatsApp Business API seguindo as instruções no QR code</small>
+                    <h5 class="mb-1">🚀 EVOLUTION API INTEGRADA</h5>
+                    <p class="mb-2">Sistema configurado para usar Evolution API - uma das melhores APIs para WhatsApp do mercado!</p>
+                    <small><strong>Recursos:</strong> QR Code real, envio de mensagens, webhooks, alta performance</small>
                 </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- API Configuration -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5><i class="bi bi-gear"></i> Configuração da Evolution API</h5>
+            </div>
+            <div class="card-body">
+                <form id="apiConfigForm" method="POST" action="{{ url_for('configure_evolution_api') }}">
+                    <div class="row">
+                        <div class="col-md-4">
+                            <label for="api_url" class="form-label">URL da API *</label>
+                            <input type="url" class="form-control" id="api_url" name="api_url" 
+                                   placeholder="http://localhost:8080" required>
+                            <div class="form-text">URL onde sua Evolution API está rodando</div>
+                        </div>
+                        <div class="col-md-4">
+                            <label for="api_key" class="form-label">API Key (Opcional)</label>
+                            <input type="text" class="form-control" id="api_key" name="api_key" 
+                                   placeholder="sua-api-key-aqui">
+                            <div class="form-text">Token de autenticação (se configurado)</div>
+                        </div>
+                        <div class="col-md-4">
+                            <label for="instance_name" class="form-label">Nome da Instância *</label>
+                            <input type="text" class="form-control" id="instance_name" name="instance_name" 
+                                   value="clientmanager" placeholder="clientmanager" required>
+                            <div class="form-text">Nome único para esta instância</div>
+                        </div>
+                    </div>
+                    <div class="mt-3">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="bi bi-check-circle"></i>
+                            Salvar Configuração
+                        </button>
+                        <button type="button" class="btn btn-outline-info ms-2" onclick="testConnection()">
+                            <i class="bi bi-wifi"></i>
+                            Testar Conexão
+                        </button>
+                    </div>
+                </form>
             </div>
         </div>
     </div>
@@ -39,15 +84,15 @@
                         {% if connected %}
                             <span class="badge bg-success fs-6">
                                 <i class="bi bi-check-circle"></i>
-                                Conectado (DEMO)
+                                Conectado
                             </span>
-                            <p class="text-muted mt-2">Sistema em modo demonstração - mensagens são simuladas.</p>
+                            <p class="text-muted mt-2">WhatsApp conectado via Evolution API e pronto para enviar mensagens.</p>
                         {% else %}
                             <span class="badge bg-warning fs-6">
-                                <i class="bi bi-gear"></i>
-                                Modo Demonstração
+                                <i class="bi bi-qr-code"></i>
+                                Aguardando QR Code
                             </span>
-                            <p class="text-muted mt-2">Escaneie o QR Code abaixo para ver informações sobre integração real com WhatsApp.</p>
+                            <p class="text-muted mt-2">Configure a API acima e gere o QR Code para conectar.</p>
                         {% endif %}
                     </div>
                     <div>
@@ -55,24 +100,14 @@
                             <form method="POST" action="{{ url_for('whatsapp_disconnect') }}" style="display: inline;">
                                 <button type="submit" class="btn btn-outline-danger">
                                     <i class="bi bi-power"></i>
-                                    Desconectar Demo
+                                    Desconectar
                                 </button>
                             </form>
                         {% else %}
-                            <div class="d-flex gap-2 flex-column">
-                                <form method="POST" action="{{ url_for('whatsapp_connect') }}" style="display: inline;">
-                                    <div class="form-check mb-2">
-                                        <input class="form-check-input" type="checkbox" id="demoMode" name="demo_mode" checked>
-                                        <label class="form-check-label" for="demoMode">
-                                            Modo Demonstração
-                                        </label>
-                                    </div>
-                                    <button type="submit" class="btn btn-success">
-                                        <i class="bi bi-play-circle"></i>
-                                        Ativar Demo WhatsApp
-                                    </button>
-                                </form>
-                            </div>
+                            <button onclick="generateQRCode()" class="btn btn-success" id="generateQRBtn">
+                                <i class="bi bi-qr-code"></i>
+                                Gerar QR Code
+                            </button>
                         {% endif %}
                     </div>
                 </div>
@@ -82,159 +117,187 @@
 </div>
 
 <!-- QR Code Section -->
-{% if not connected and qr_code %}
-<div class="row mb-4">
+<div class="row mb-4" id="qrCodeSection" style="display: none;">
     <div class="col-md-8 mx-auto">
         <div class="card">
-            <div class="card-header text-center bg-primary text-white">
-                <h5><i class="bi bi-qr-code"></i> QR Code - Informações de Integração</h5>
+            <div class="card-header text-center bg-success text-white">
+                <h5><i class="bi bi-qr-code"></i> QR Code - Evolution API</h5>
             </div>
             <div class="card-body text-center">
-                <div class="mb-3">
-                    <img src="{{ qr_code }}" alt="QR Code WhatsApp Integration Info" class="img-fluid" style="max-width: 350px; border: 3px solid #e3f2fd; border-radius: 10px;">
+                <div class="mb-3" id="qrCodeContainer">
+                    <!-- QR code will be inserted here -->
                 </div>
-                <div class="alert alert-primary">
-                    <h6><i class="bi bi-info-circle"></i> Como usar este QR Code:</h6>
+                <div class="alert alert-info">
+                    <h6><i class="bi bi-info-circle"></i> Como Conectar:</h6>
                     <ol class="text-start">
-                        <li>Escaneie com qualquer app de QR code</li>
-                        <li>Veja as instruções detalhadas para integração real</li>
-                        <li>Acesse a documentação oficial do WhatsApp Business API</li>
-                        <li>Configure sua aplicação em produção</li>
+                        <li>Abra o WhatsApp no seu celular</li>
+                        <li>Vá em <strong>Menu (⋮) > Dispositivos conectados</strong></li>
+                        <li>Toque em <strong>Conectar um dispositivo</strong></li>
+                        <li>Aponte a câmera para este QR Code</li>
+                        <li>Aguarde a confirmação de conexão</li>
                     </ol>
                 </div>
                 <div class="d-flex gap-2 justify-content-center">
-                    <button onclick="window.location.reload()" class="btn btn-outline-primary">
+                    <button onclick="refreshQRCode()" class="btn btn-outline-primary">
                         <i class="bi bi-arrow-clockwise"></i>
                         Atualizar QR Code
                     </button>
-                    <button onclick="showIntegrationGuide()" class="btn btn-info">
-                        <i class="bi bi-book"></i>
-                        Guia de Integração
+                    <button onclick="checkConnection()" class="btn btn-outline-success">
+                        <i class="bi bi-wifi"></i>
+                        Verificar Conexão
                     </button>
                 </div>
             </div>
         </div>
     </div>
 </div>
-{% endif %}
 
-<!-- Integration Guide Modal -->
-<div class="modal fade" id="integrationModal" tabindex="-1">
-    <div class="modal-dialog modal-lg">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title">
-                    <i class="bi bi-whatsapp text-success"></i>
-                    Guia de Integração WhatsApp Business API
-                </h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+<!-- Evolution API Installation Guide -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5><i class="bi bi-download"></i> Guia de Instalação Evolution API</h5>
             </div>
-            <div class="modal-body">
-                <div class="accordion" id="integrationAccordion">
+            <div class="card-body">
+                <div class="accordion" id="installationAccordion">
                     <div class="accordion-item">
                         <h2 class="accordion-header">
-                            <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#step1">
-                                1️⃣ Configuração WhatsApp Business API
+                            <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#docker">
+                                🐳 Instalação com Docker (Recomendado)
                             </button>
                         </h2>
-                        <div id="step1" class="accordion-collapse collapse show">
+                        <div id="docker" class="accordion-collapse collapse show">
                             <div class="accordion-body">
-                                <ul>
-                                    <li>Acesse <a href="https://developers.facebook.com/docs/whatsapp" target="_blank">WhatsApp Business API</a></li>
-                                    <li>Crie uma conta no Facebook for Developers</li>
-                                    <li>Configure seu aplicativo e obtenha credenciais</li>
-                                    <li>Verifique seu número de telefone comercial</li>
-                                </ul>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="accordion-item">
-                        <h2 class="accordion-header">
-                            <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#step2">
-                                2️⃣ Configuração do Webhook
-                            </button>
-                        </h2>
-                        <div id="step2" class="accordion-collapse collapse">
-                            <div class="accordion-body">
-                                <ul>
-                                    <li>Configure um endpoint público para webhooks</li>
-                                    <li>Implemente verificação de token</li>
-                                    <li>Configure SSL/HTTPS obrigatório</li>
-                                    <li>Teste a conectividade do webhook</li>
-                                </ul>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="accordion-item">
-                        <h2 class="accordion-header">
-                            <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#step3">
-                                3️⃣ Modificações no Código
-                            </button>
-                        </h2>
-                        <div id="step3" class="accordion-collapse collapse">
-                            <div class="accordion-body">
-                                <pre><code># No arquivo whatsapp_integration.py
-# Linha ~52: Altere para produção
-self.demo_mode = False
+                                <h6>1. Crie um arquivo docker-compose.yml:</h6>
+                                <pre><code>version: '3.8'
+services:
+  evolution-api:
+    image: davidsongomes/evolution-api:latest
+    container_name: evolution_api
+    ports:
+      - "8080:8080"
+    environment:
+      - SERVER_TYPE=http
+      - CORS_ORIGIN=*
+      - DEL_INSTANCE=false
+      - DEL_TEMP_INSTANCES=true
+    volumes:
+      - evolution_instances:/evolution/instances
+      - evolution_store:/evolution/store
+    restart: unless-stopped
 
-# Configure suas credenciais
-WHATSAPP_TOKEN = "seu_token_aqui"
-WHATSAPP_PHONE_ID = "seu_phone_id"
-WEBHOOK_VERIFY_TOKEN = "seu_verify_token"</code></pre>
+volumes:
+  evolution_instances:
+  evolution_store:</code></pre>
+                                
+                                <h6 class="mt-3">2. Execute os comandos:</h6>
+                                <pre><code># Inicie a API
+docker-compose up -d
+
+# Verifique se está rodando
+docker ps</code></pre>
+                                
+                                <div class="alert alert-success mt-3">
+                                    <strong>Pronto!</strong> Sua Evolution API estará rodando em <code>http://localhost:8080</code>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="accordion-item">
+                        <h2 class="accordion-header">
+                            <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#manual">
+                                ⚙️ Instalação Manual
+                            </button>
+                        </h2>
+                        <div id="manual" class="accordion-collapse collapse">
+                            <div class="accordion-body">
+                                <h6>1. Clone o repositório:</h6>
+                                <pre><code>git clone https://github.com/EvolutionAPI/evolution-api.git
+cd evolution-api</code></pre>
+                                
+                                <h6>2. Instale as dependências:</h6>
+                                <pre><code>npm install</code></pre>
+                                
+                                <h6>3. Configure o arquivo .env:</h6>
+                                <pre><code>cp .env.example .env</code></pre>
+                                
+                                <h6>4. Inicie a API:</h6>
+                                <pre><code>npm run start:prod</code></pre>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="accordion-item">
+                        <h2 class="accordion-header">
+                            <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#cloud">
+                                ☁️ Evolution API na Nuvem
+                            </button>
+                        </h2>
+                        <div id="cloud" class="accordion-collapse collapse">
+                            <div class="accordion-body">
+                                <p>Você pode usar serviços que oferecem Evolution API hospedada:</p>
+                                <ul>
+                                    <li><strong>Railway:</strong> Deploy com um clique</li>
+                                    <li><strong>Heroku:</strong> Hospedagem gratuita (com limitações)</li>
+                                    <li><strong>DigitalOcean:</strong> VPS com Docker</li>
+                                    <li><strong>AWS/Google Cloud:</strong> Instâncias na nuvem</li>
+                                </ul>
+                                
+                                <div class="alert alert-info">
+                                    <strong>Dica:</strong> Para produção, recomendamos usar um servidor VPS com pelo menos 1GB RAM.
+                                </div>
                             </div>
                         </div>
                     </div>
                 </div>
             </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>
-                <a href="https://developers.facebook.com/docs/whatsapp/getting-started" target="_blank" class="btn btn-primary">
-                    <i class="bi bi-box-arrow-up-right"></i>
-                    Documentação Oficial
-                </a>
-            </div>
         </div>
     </div>
 </div>
 
-<!-- Instructions -->
+<!-- API Status Info -->
 <div class="row">
     <div class="col-12">
         <div class="card">
             <div class="card-header">
-                <h5><i class="bi bi-info-circle"></i> Status Atual do Sistema</h5>
+                <h5><i class="bi bi-info-circle"></i> Recursos da Evolution API</h5>
             </div>
             <div class="card-body">
                 <div class="row">
                     <div class="col-md-6">
-                        <h6>✅ Recursos Funcionais (Demo):</h6>
+                        <h6>✅ Recursos Inclusos:</h6>
                         <ul>
-                            <li>Dashboard de clientes completo</li>
-                            <li>Agendamento de lembretes</li>
-                            <li>Templates de mensagens personalizadas</li>
-                            <li>Sistema de renovação automática</li>
-                            <li>Relatórios e estatísticas</li>
-                            <li>Backup automático no GitHub</li>
+                            <li>QR Code real para conexão</li>
+                            <li>Envio de mensagens de texto</li>
+                            <li>Envio de imagens e documentos</li>
+                            <li>Webhooks para receber mensagens</li>
+                            <li>Grupos e listas de transmissão</li>
+                            <li>Status de entrega das mensagens</li>
                         </ul>
                     </div>
                     <div class="col-md-6">
-                        <h6>🔄 Para Produção (Necessário):</h6>
+                        <h6>🔧 Configurações Recomendadas:</h6>
                         <ul>
-                            <li>Configurar WhatsApp Business API</li>
-                            <li>Obter token de acesso oficial</li>
-                            <li>Configurar webhook público</li>
-                            <li>Verificar número comercial</li>
-                            <li>Desativar modo demo no código</li>
-                            <li>Testar envio real de mensagens</li>
+                            <li>Use HTTPS em produção</li>
+                            <li>Configure um webhook endpoint</li>
+                            <li>Ative logs para debug</li>
+                            <li>Configure rate limiting</li>
+                            <li>Use instâncias separadas por cliente</li>
+                            <li>Monitore o status da API</li>
                         </ul>
                     </div>
                 </div>
                 
                 <div class="alert alert-success mt-3">
-                    <h6><i class="bi bi-check-circle"></i> Importante:</h6>
+                    <h6><i class="bi bi-check-circle"></i> Vantagens da Evolution API:</h6>
                     <p class="mb-0">
-                        <strong>O sistema está 100% funcional para gerenciamento de clientes.</strong> Apenas o envio real de mensagens WhatsApp requer configuração da API oficial. 
-                        Todas as outras funcionalidades (cadastro, edição, renovação, relatórios) estão prontas para uso.
+                        <strong>✅ Gratuita e Open Source</strong> • 
+                        <strong>✅ Fácil de configurar</strong> • 
+                        <strong>✅ Comunidade ativa</strong> • 
+                        <strong>✅ Documentação completa</strong> • 
+                        <strong>✅ Suporte a multi-instâncias</strong>
                     </p>
                 </div>
             </div>
@@ -242,33 +305,30 @@ WEBHOOK_VERIFY_TOKEN = "seu_verify_token"</code></pre>
     </div>
 </div>
 
-<!-- Test Message Section (Demo) -->
+<!-- Test Message Section -->
 {% if connected %}
 <div class="row mt-4">
     <div class="col-md-8 mx-auto">
-        <div class="card border-warning">
-            <div class="card-header bg-warning text-dark">
-                <h5><i class="bi bi-send"></i> Teste de Mensagem (DEMO)</h5>
+        <div class="card border-success">
+            <div class="card-header bg-success text-white">
+                <h5><i class="bi bi-send"></i> Testar Envio de Mensagem</h5>
             </div>
             <div class="card-body">
-                <div class="alert alert-warning">
-                    <strong>Modo Demo:</strong> As mensagens serão simuladas, não enviadas realmente.
-                </div>
                 <form id="testMessageForm">
                     <div class="mb-3">
                         <label for="testPhone" class="form-label">Número de Teste</label>
                         <input type="tel" class="form-control" id="testPhone" 
                                placeholder="Ex: 5511999999999" required>
-                        <div class="form-text">Formato: código do país + DDD + número</div>
+                        <div class="form-text">Formato: código do país + DDD + número (sem espaços)</div>
                     </div>
                     <div class="mb-3">
                         <label for="testMessage" class="form-label">Mensagem de Teste</label>
                         <textarea class="form-control" id="testMessage" rows="3" 
                                   placeholder="Digite uma mensagem de teste..." required></textarea>
                     </div>
-                    <button type="submit" class="btn btn-warning">
+                    <button type="submit" class="btn btn-success">
                         <i class="bi bi-send"></i>
-                        Simular Envio
+                        Enviar via Evolution API
                     </button>
                 </form>
             </div>
@@ -280,24 +340,196 @@ WEBHOOK_VERIFY_TOKEN = "seu_verify_token"</code></pre>
 
 {% block scripts %}
 <script>
-    function showIntegrationGuide() {
-        new bootstrap.Modal(document.getElementById('integrationModal')).show();
+    // Configuration form
+    document.getElementById('apiConfigForm').addEventListener('submit', function(e) {
+        e.preventDefault();
+        
+        const apiUrl = document.getElementById('api_url').value;
+        const apiKey = document.getElementById('api_key').value;
+        const instanceName = document.getElementById('instance_name').value;
+        
+        // Save configuration (you'd implement the backend route)
+        fetch('/api/whatsapp/configure', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+                api_url: apiUrl,
+                api_key: apiKey,
+                instance_name: instanceName
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                Swal.fire({
+                    title: 'Configuração Salva!',
+                    text: 'Evolution API configurada com sucesso',
+                    icon: 'success',
+                    confirmButtonColor: '#28a745'
+                });
+            } else {
+                Swal.fire({
+                    title: 'Erro',
+                    text: data.error || 'Erro ao salvar configuração',
+                    icon: 'error'
+                });
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            Swal.fire({
+                title: 'Erro',
+                text: 'Erro de conexão',
+                icon: 'error'
+            });
+        });
+    });
+
+    // Generate QR Code
+    function generateQRCode() {
+        const btn = document.getElementById('generateQRBtn');
+        btn.disabled = true;
+        btn.innerHTML = '<i class="bi bi-hourglass-split"></i> Gerando...';
+        
+        fetch('/api/whatsapp/qrcode', {method: 'POST'})
+        .then(response => response.json())
+        .then(data => {
+            if (data.success && data.qr_code) {
+                document.getElementById('qrCodeContainer').innerHTML = 
+                    `<img src="${data.qr_code}" alt="QR Code" class="img-fluid" style="max-width: 350px; border: 3px solid #28a745; border-radius: 10px;">`;
+                document.getElementById('qrCodeSection').style.display = 'block';
+                
+                // Auto-check connection every 3 seconds
+                const connectionChecker = setInterval(() => {
+                    checkConnection(true).then(connected => {
+                        if (connected) {
+                            clearInterval(connectionChecker);
+                            window.location.reload();
+                        }
+                    });
+                }, 3000);
+                
+            } else {
+                Swal.fire({
+                    title: 'Erro',
+                    text: data.error || 'Erro ao gerar QR code',
+                    icon: 'error'
+                });
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            Swal.fire({
+                title: 'Erro',
+                text: 'Erro de conexão com a API',
+                icon: 'error'
+            });
+        })
+        .finally(() => {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="bi bi-qr-code"></i> Gerar QR Code';
+        });
     }
 
-    // Auto-refresh QR code every 60 seconds if not connected
-    {% if not connected %}
-    setInterval(function() {
-        if (!{{ connected|tojson }}) {
-            // Only refresh if still on the same page
-            if (window.location.pathname === '/whatsapp') {
-                console.log('Refreshing QR code...');
-                window.location.reload();
-            }
-        }
-    }, 60000);
-    {% endif %}
+    // Refresh QR Code
+    function refreshQRCode() {
+        generateQRCode();
+    }
 
-    // Test message form (Demo)
+    // Check connection
+    function checkConnection(silent = false) {
+        return fetch('/api/whatsapp/status')
+        .then(response => response.json())
+        .then(data => {
+            if (!silent) {
+                if (data.connected) {
+                    Swal.fire({
+                        title: 'Conectado!',
+                        text: 'WhatsApp conectado via Evolution API',
+                        icon: 'success',
+                        confirmButtonColor: '#28a745'
+                    }).then(() => {
+                        window.location.reload();
+                    });
+                } else {
+                    Swal.fire({
+                        title: 'Não Conectado',
+                        text: data.error || 'WhatsApp não está conectado',
+                        icon: 'warning'
+                    });
+                }
+            }
+            return data.connected;
+        })
+        .catch(error => {
+            if (!silent) {
+                console.error('Error:', error);
+                Swal.fire({
+                    title: 'Erro',
+                    text: 'Erro ao verificar conexão',
+                    icon: 'error'
+                });
+            }
+            return false;
+        });
+    }
+
+    // Test connection
+    function testConnection() {
+        const apiUrl = document.getElementById('api_url').value;
+        if (!apiUrl) {
+            Swal.fire({
+                title: 'URL Necessária',
+                text: 'Digite a URL da Evolution API primeiro',
+                icon: 'warning'
+            });
+            return;
+        }
+        
+        Swal.fire({
+            title: 'Testando...',
+            text: 'Verificando conexão com Evolution API',
+            allowOutsideClick: false,
+            didOpen: () => {
+                Swal.showLoading();
+            }
+        });
+        
+        fetch('/api/whatsapp/test-connection', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({api_url: apiUrl})
+        })
+        .then(response => response.json())
+        .then(data => {
+            Swal.close();
+            if (data.success) {
+                Swal.fire({
+                    title: 'Conexão OK!',
+                    text: 'Evolution API está respondendo corretamente',
+                    icon: 'success',
+                    confirmButtonColor: '#28a745'
+                });
+            } else {
+                Swal.fire({
+                    title: 'Erro de Conexão',
+                    text: data.error || 'Não foi possível conectar à Evolution API',
+                    icon: 'error'
+                });
+            }
+        })
+        .catch(error => {
+            Swal.close();
+            console.error('Error:', error);
+            Swal.fire({
+                title: 'Erro',
+                text: 'Erro ao testar conexão',
+                icon: 'error'
+            });
+        });
+    }
+
+    // Test message form
     {% if connected %}
     document.getElementById('testMessageForm').addEventListener('submit', function(e) {
         e.preventDefault();
@@ -305,23 +537,51 @@ WEBHOOK_VERIFY_TOKEN = "seu_verify_token"</code></pre>
         const phone = document.getElementById('testPhone').value;
         const message = document.getElementById('testMessage').value;
         
-        // Simulate sending message
-        Swal.fire({
-            title: 'Mensagem Simulada!',
-            html: `<strong>Para:</strong> ${phone}<br><br><strong>Mensagem:</strong><br>${message}`,
-            icon: 'info',
-            confirmButtonText: 'OK',
-            confirmButtonColor: '#28a745'
+        // Send test message
+        fetch('/api/whatsapp/send-test', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({phone: phone, message: message})
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                Swal.fire({
+                    title: 'Mensagem Enviada!',
+                    text: `Mensagem enviada para ${phone} via Evolution API`,
+                    icon: 'success',
+                    confirmButtonColor: '#28a745'
+                });
+                this.reset();
+            } else {
+                Swal.fire({
+                    title: 'Erro no Envio',
+                    text: data.error || 'Erro ao enviar mensagem',
+                    icon: 'error'
+                });
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            Swal.fire({
+                title: 'Erro',
+                text: 'Erro de conexão',
+                icon: 'error'
+            });
         });
-        
-        // Clear form
-        this.reset();
     });
     {% endif %}
 
-    // Add some animations
+    // Auto-refresh status every 30 seconds
+    setInterval(() => {
+        if (!{{ connected|tojson }}) {
+            checkConnection(true);
+        }
+    }, 30000);
+
+    // Load current configuration on page load
     document.addEventListener('DOMContentLoaded', function() {
-        // Animate cards on load
+        // Animate cards
         const cards = document.querySelectorAll('.card');
         cards.forEach((card, index) => {
             card.style.opacity = '0';
@@ -332,6 +592,16 @@ WEBHOOK_VERIFY_TOKEN = "seu_verify_token"</code></pre>
                 card.style.transform = 'translateY(0)';
             }, index * 100);
         });
+        
+        // Load saved configuration
+        fetch('/api/whatsapp/config')
+        .then(response => response.json())
+        .then(data => {
+            if (data.api_url) document.getElementById('api_url').value = data.api_url;
+            if (data.api_key) document.getElementById('api_key').value = data.api_key;
+            if (data.instance_name) document.getElementById('instance_name').value = data.instance_name;
+        })
+        .catch(error => console.log('No saved config found'));
     });
 </script>
 {% endblock %}
