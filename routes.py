@@ -1,4 +1,4 @@
-from flask import render_template, request, redirect, url_for, flash, jsonify
+THIS SHOULD BE A LINTER ERRORfrom flask import render_template, request, redirect, url_for, flash, jsonify
 from app import app, scheduler
 import uuid
 from datetime import datetime
@@ -9,7 +9,7 @@ from whatsapp_integration import get_whatsapp_qr_code, is_whatsapp_connected, co
 
 # Importar melhorias implementadas
 from validators import ClientValidator, MessageTemplateValidator, ValidationError
-from rate_limiter import rate_limit_form, rate_limit_api, rate_limit_sensitive, get_client_ip
+from rate_limiter import rate_limiter, get_client_ip
 from logger_config import log_user_action, log_with_context, app_logger, client_logger
 from simple_cache import cache_dashboard_stats, cache_client_list, app_cache, invalidate_cache_pattern
 from backup_utils import create_backup, backup_manager
@@ -331,7 +331,7 @@ def update_client_observations(client_id):
     client_ip = get_client_ip()
     
     # Rate limiting for form action
-    if not rate_limit_form(limit=10).is_allowed(client_ip):
+    if not rate_limiter.is_allowed(client_ip, limit=10):
         flash('Muitas tentativas. Aguarde.', 'error')
         return redirect(url_for('clients'))
     
