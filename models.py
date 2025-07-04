@@ -3,7 +3,7 @@ from typing import Dict, List, Optional
 
 class Client:
     def __init__(self, id: str, name: str, phone: str, plan_type: str, value: float, 
-                 plan_duration: str, reminder_time_3days: str = "09:00", 
+                 plan_duration: str, server: str = "UltraPlay", reminder_time_3days: str = "09:00", 
                  reminder_time_payment: str = "10:00", custom_message_3days: str = "", 
                  custom_message_payment: str = "", created_at: Optional[str] = None,
                  payment_status: str = "pending", last_renewal_date: Optional[str] = None,
@@ -14,6 +14,7 @@ class Client:
         self.plan_type = plan_type  # 'IPTV', 'VPN', 'STREAMING', 'GAMING', 'INTERNET', 'OUTROS'
         self.value = value
         self.plan_duration = plan_duration  # Data de duração do plano (YYYY-MM-DD)
+        self.server = server  # 'UltraPlay', '4kPlayerPro', 'Blaze'
         self.reminder_time_3days = reminder_time_3days  # Format: "HH:MM"
         self.reminder_time_payment = reminder_time_payment  # Format: "HH:MM"
         self.custom_message_3days = custom_message_3days
@@ -145,6 +146,39 @@ class Client:
             'history': self.renewal_history
         }
     
+    def get_total_revenue(self) -> float:
+        """Calcula o total de receita gerada por este cliente"""
+        # Valor inicial do plano
+        initial_revenue = self.value
+        
+        # Soma das renovações
+        renewals_revenue = sum(r.get('value', 0) for r in self.renewal_history)
+        
+        return initial_revenue + renewals_revenue
+    
+    def get_client_age_days(self) -> int:
+        """Calcula quantos dias o cliente está ativo"""
+        try:
+            created_date = datetime.fromisoformat(self.created_at.replace('Z', '+00:00'))
+            return (datetime.now() - created_date).days
+        except:
+            return 0
+    
+    def get_lifetime_value(self) -> float:
+        """Calcula o LTV (Lifetime Value) do cliente"""
+        return self.get_total_revenue()
+    
+    def get_monthly_average_revenue(self) -> float:
+        """Calcula a receita média mensal do cliente"""
+        days_active = self.get_client_age_days()
+        if days_active == 0:
+            return 0
+        
+        total_revenue = self.get_total_revenue()
+        months_active = max(1, days_active / 30)  # Mínimo 1 mês
+        
+        return total_revenue / months_active
+    
     def to_dict(self) -> Dict:
         return {
             'id': self.id,
@@ -153,6 +187,7 @@ class Client:
             'plan_type': self.plan_type,
             'value': self.value,
             'plan_duration': self.plan_duration,
+            'server': getattr(self, 'server', 'UltraPlay'),
             'reminder_time_3days': self.reminder_time_3days,
             'reminder_time_payment': self.reminder_time_payment,
             'custom_message_3days': self.custom_message_3days,

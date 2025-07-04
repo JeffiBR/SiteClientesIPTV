@@ -482,6 +482,126 @@ def whatsapp_disconnect():
     flash('WhatsApp desconectado', 'info')
     return redirect(url_for('whatsapp'))
 
+@app.route('/reports')
+def reports():
+    """Client reports - most profitable, oldest, and server analysis"""
+    try:
+        clients = storage.get_clients()
+        
+        # Calculate additional fields for each client
+        enhanced_clients = []
+        for client in clients:
+            # Ensure server field exists
+            server = getattr(client, 'server', 'UltraPlay')
+            if not server:
+                server = 'UltraPlay'
+            
+            enhanced_client = {
+                'id': client.id,
+                'name': client.name,
+                'phone': client.phone,
+                'plan_type': client.plan_type,
+                'value': client.value,
+                'server': server,
+                'status': client.status,
+                'status_color': client.status_color,
+                'total_revenue': client.get_total_revenue(),
+                'ltv': client.get_lifetime_value(),
+                'monthly_avg': client.get_monthly_average_revenue(),
+                'age_days': client.get_client_age_days(),
+                'total_renewals': len(client.renewal_history),
+                'last_renewal': client.last_renewal_date,
+                'last_renewal_formatted': datetime.fromisoformat(client.last_renewal_date.replace('Z', '+00:00')).strftime('%d/%m/%Y') if client.last_renewal_date else None
+            }
+            enhanced_clients.append(enhanced_client)
+        
+        # Sort clients by total revenue (most profitable)
+        most_profitable = sorted(enhanced_clients, key=lambda x: x['total_revenue'], reverse=True)[:20]
+        
+        # Sort clients by age (oldest)
+        oldest_clients = sorted(enhanced_clients, key=lambda x: x['age_days'], reverse=True)[:20]
+        
+        # Server statistics
+        server_stats = {}
+        servers = ['UltraPlay', '4kPlayerPro', 'Blaze']
+        
+        total_clients = len(enhanced_clients)
+        total_revenue = sum(c['total_revenue'] for c in enhanced_clients)
+        
+        for server in servers:
+            server_clients = [c for c in enhanced_clients if c['server'] == server]
+            server_revenue = sum(c['total_revenue'] for c in server_clients)
+            server_count = len(server_clients)
+            
+            # Plan type breakdown for this server
+            plan_types = {}
+            for client in server_clients:
+                plan_type = client['plan_type']
+                plan_types[plan_type] = plan_types.get(plan_type, 0) + 1
+            
+            server_stats[server] = {
+                'clients': server_count,
+                'revenue': server_revenue,
+                'avg_revenue': server_revenue / server_count if server_count > 0 else 0,
+                'percentage': (server_count / total_clients * 100) if total_clients > 0 else 0,
+                'plan_types': plan_types
+            }
+        
+        # Revenue by category
+        revenue_by_category = {}
+        categories = ['IPTV', 'VPN', 'STREAMING', 'GAMING', 'INTERNET', 'OUTROS']
+        
+        for category in categories:
+            category_revenue = sum(c['total_revenue'] for c in enhanced_clients if c['plan_type'] == category)
+            if category_revenue > 0:
+                revenue_by_category[category] = category_revenue
+        
+        # General statistics
+        active_clients = len([c for c in enhanced_clients if c['status'] == 'ativo'])
+        expiring_soon = len([c for c in enhanced_clients if c['status'] == 'vencendo'])
+        expired = len([c for c in enhanced_clients if c['status'] == 'expirado'])
+        total_renewals = sum(c['total_renewals'] for c in enhanced_clients)
+        
+        avg_client_age = sum(c['age_days'] for c in enhanced_clients) / len(enhanced_clients) if enhanced_clients else 0
+        avg_ltv = sum(c['ltv'] for c in enhanced_clients) / len(enhanced_clients) if enhanced_clients else 0
+        
+        stats = {
+            'total_revenue': total_revenue,
+            'total_clients': total_clients,
+            'avg_client_age': int(avg_client_age),
+            'avg_ltv': avg_ltv,
+            'active_clients': active_clients,
+            'expiring_soon': expiring_soon,
+            'expired': expired,
+            'total_renewals': total_renewals
+        }
+        
+        return render_template('reports.html',
+                             most_profitable=most_profitable,
+                             oldest_clients=oldest_clients,
+                             server_stats=server_stats,
+                             revenue_by_category=revenue_by_category,
+                             stats=stats)
+        
+    except Exception as e:
+        logger.error(f"Error loading reports: {str(e)}")
+        flash('Erro ao carregar relatórios', 'error')
+        return render_template('reports.html',
+                             most_profitable=[],
+                             oldest_clients=[],
+                             server_stats={},
+                             revenue_by_category={},
+                             stats={
+                                 'total_revenue': 0,
+                                 'total_clients': 0,
+                                 'avg_client_age': 0,
+                                 'avg_ltv': 0,
+                                 'active_clients': 0,
+                                 'expiring_soon': 0,
+                                 'expired': 0,
+                                 'total_renewals': 0
+                             })
+
 @app.route('/ai/config', methods=['GET', 'POST'])
 def ai_config():
     """AI Configuration page"""

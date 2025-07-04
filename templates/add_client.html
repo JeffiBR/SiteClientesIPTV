@@ -58,7 +58,7 @@
                                 Detalhes do Plano
                             </h6>
                         </div>
-                        <div class="col-md-6">
+                        <div class="col-md-4">
                             <label for="plan_type" class="form-label">Categoria do Plano *</label>
                             <select class="form-select" id="plan_type" name="plan_type" required onchange="updatePlanDetails()">
                                 <option value="">Selecione a categoria</option>
@@ -70,7 +70,16 @@
                                 <option value="OUTROS">⚙️ Outros Serviços</option>
                             </select>
                         </div>
-                        <div class="col-md-6">
+                        <div class="col-md-4">
+                            <label for="server" class="form-label">Servidor *</label>
+                            <select class="form-select" id="server" name="server" required>
+                                <option value="">Selecione o servidor</option>
+                                <option value="UltraPlay">🟢 UltraPlay</option>
+                                <option value="4kPlayerPro">🔵 4kPlayerPro</option>
+                                <option value="Blaze">🔴 Blaze</option>
+                            </select>
+                        </div>
+                        <div class="col-md-4">
                             <label for="value" class="form-label">Valor do Plano (R$) *</label>
                             <div class="input-group">
                                 <span class="input-group-text">R$</span>

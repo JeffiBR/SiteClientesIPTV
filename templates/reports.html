@@ -1,0 +1,459 @@
+{% extends "base.html" %}
+
+{% block title %}Relatórios - Bot Cliente Manager{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h1 class="animate-slideInUp">
+                <i class="bi bi-graph-up-arrow text-gradient"></i>
+                Relatórios de Clientes
+            </h1>
+            <a href="{{ url_for('dashboard') }}" class="btn btn-secondary hover-lift">
+                <i class="bi bi-arrow-left"></i>
+                Voltar
+            </a>
+        </div>
+    </div>
+</div>
+
+<!-- Summary Cards -->
+<div class="row mb-4">
+    <div class="col-lg-3 col-md-6 mb-3">
+        <div class="card glass animate-slideInUp">
+            <div class="card-body text-center">
+                <i class="bi bi-currency-dollar display-4 text-success mb-2"></i>
+                <h3 class="text-gradient">R$ {{ "{:.2f}".format(stats.total_revenue) }}</h3>
+                <p class="text-muted mb-0">Receita Total</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-3 col-md-6 mb-3">
+        <div class="card glass animate-slideInUp">
+            <div class="card-body text-center">
+                <i class="bi bi-people display-4 text-primary mb-2"></i>
+                <h3 class="text-gradient">{{ stats.total_clients }}</h3>
+                <p class="text-muted mb-0">Total de Clientes</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-3 col-md-6 mb-3">
+        <div class="card glass animate-slideInUp">
+            <div class="card-body text-center">
+                <i class="bi bi-clock-history display-4 text-info mb-2"></i>
+                <h3 class="text-gradient">{{ stats.avg_client_age }}</h3>
+                <p class="text-muted mb-0">Idade Média (dias)</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-3 col-md-6 mb-3">
+        <div class="card glass animate-slideInUp">
+            <div class="card-body text-center">
+                <i class="bi bi-star display-4 text-warning mb-2"></i>
+                <h3 class="text-gradient">R$ {{ "{:.2f}".format(stats.avg_ltv) }}</h3>
+                <p class="text-muted mb-0">LTV Médio</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Filters -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card glass">
+            <div class="card-body">
+                <h5 class="card-title">
+                    <i class="bi bi-funnel me-2"></i>Filtros
+                </h5>
+                <div class="row">
+                    <div class="col-md-3">
+                        <label for="serverFilter" class="form-label">Servidor:</label>
+                        <select class="form-select" id="serverFilter" onchange="filterReports()">
+                            <option value="all">Todos os Servidores</option>
+                            <option value="UltraPlay">🟢 UltraPlay</option>
+                            <option value="4kPlayerPro">🔵 4kPlayerPro</option>
+                            <option value="Blaze">🔴 Blaze</option>
+                        </select>
+                    </div>
+                    <div class="col-md-3">
+                        <label for="planTypeFilter" class="form-label">Categoria:</label>
+                        <select class="form-select" id="planTypeFilter" onchange="filterReports()">
+                            <option value="all">Todas as Categorias</option>
+                            <option value="IPTV">📺 IPTV</option>
+                            <option value="VPN">🔒 VPN</option>
+                            <option value="STREAMING">🎬 STREAMING</option>
+                            <option value="GAMING">🎮 GAMING</option>
+                            <option value="INTERNET">🌐 INTERNET</option>
+                            <option value="OUTROS">⚙️ OUTROS</option>
+                        </select>
+                    </div>
+                    <div class="col-md-3">
+                        <label for="timeFilter" class="form-label">Período:</label>
+                        <select class="form-select" id="timeFilter" onchange="filterReports()">
+                            <option value="all">Todo o Período</option>
+                            <option value="30">Últimos 30 dias</option>
+                            <option value="90">Últimos 90 dias</option>
+                            <option value="180">Últimos 6 meses</option>
+                            <option value="365">Último ano</option>
+                        </select>
+                    </div>
+                    <div class="col-md-3 d-flex align-items-end">
+                        <button class="btn btn-outline-secondary w-100" onclick="resetFilters()">
+                            <i class="bi bi-arrow-clockwise me-2"></i>Limpar
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Reports Tabs -->
+<div class="row">
+    <div class="col-12">
+        <ul class="nav nav-tabs mb-4" id="reportsTab" role="tablist">
+            <li class="nav-item" role="presentation">
+                <button class="nav-link active" id="most-profitable-tab" data-bs-toggle="tab" 
+                        data-bs-target="#most-profitable" type="button" role="tab">
+                    <i class="bi bi-trophy me-2"></i>Mais Lucrativos
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="oldest-clients-tab" data-bs-toggle="tab" 
+                        data-bs-target="#oldest-clients" type="button" role="tab">
+                    <i class="bi bi-clock-history me-2"></i>Clientes Mais Antigos
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="server-analysis-tab" data-bs-toggle="tab" 
+                        data-bs-target="#server-analysis" type="button" role="tab">
+                    <i class="bi bi-server me-2"></i>Análise por Servidor
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="revenue-analysis-tab" data-bs-toggle="tab" 
+                        data-bs-target="#revenue-analysis" type="button" role="tab">
+                    <i class="bi bi-graph-up me-2"></i>Análise de Receita
+                </button>
+            </li>
+        </ul>
+
+        <div class="tab-content" id="reportsTabContent">
+            <!-- Most Profitable Clients -->
+            <div class="tab-pane fade show active" id="most-profitable" role="tabpanel">
+                <div class="card glass">
+                    <div class="card-header">
+                        <h5 class="mb-0">
+                            <i class="bi bi-trophy text-warning me-2"></i>
+                            Top Clientes Mais Lucrativos
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-hover">
+                                <thead>
+                                    <tr>
+                                        <th>Pos.</th>
+                                        <th>Cliente</th>
+                                        <th>Categoria</th>
+                                        <th>Servidor</th>
+                                        <th>Receita Total</th>
+                                        <th>Renovações</th>
+                                        <th>LTV</th>
+                                        <th>Receita/Mês</th>
+                                        <th>Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="most-profitable-tbody">
+                                    {% for client in most_profitable %}
+                                    <tr class="client-row" data-server="{{ client.server or 'UltraPlay' }}" 
+                                        data-plan-type="{{ client.plan_type }}" data-age="{{ client.age_days }}">
+                                        <td>
+                                            <span class="badge bg-warning text-dark">{{ loop.index }}</span>
+                                        </td>
+                                        <td>
+                                            <strong>{{ client.name }}</strong><br>
+                                            <small class="text-muted">{{ client.phone }}</small>
+                                        </td>
+                                        <td>
+                                            <span class="badge bg-info">{{ client.plan_type }}</span>
+                                        </td>
+                                        <td>
+                                            {% if client.server == 'UltraPlay' %}
+                                                <span class="badge bg-success">🟢 {{ client.server or 'UltraPlay' }}</span>
+                                            {% elif client.server == '4kPlayerPro' %}
+                                                <span class="badge bg-primary">🔵 {{ client.server }}</span>
+                                            {% elif client.server == 'Blaze' %}
+                                                <span class="badge bg-danger">🔴 {{ client.server }}</span>
+                                            {% else %}
+                                                <span class="badge bg-success">🟢 UltraPlay</span>
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            <strong class="text-success">R$ {{ "{:.2f}".format(client.total_revenue) }}</strong>
+                                        </td>
+                                        <td>
+                                            <span class="badge bg-secondary">{{ client.total_renewals }}</span>
+                                        </td>
+                                        <td>
+                                            <span class="text-success">R$ {{ "{:.2f}".format(client.ltv) }}</span>
+                                        </td>
+                                        <td>
+                                            <span class="text-primary">R$ {{ "{:.2f}".format(client.monthly_avg) }}</span>
+                                        </td>
+                                        <td>
+                                            <span class="badge bg-{{ client.status_color }}">{{ client.status }}</span>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Oldest Clients -->
+            <div class="tab-pane fade" id="oldest-clients" role="tabpanel">
+                <div class="card glass">
+                    <div class="card-header">
+                        <h5 class="mb-0">
+                            <i class="bi bi-clock-history text-info me-2"></i>
+                            Clientes Mais Antigos e Fiéis
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-hover">
+                                <thead>
+                                    <tr>
+                                        <th>Pos.</th>
+                                        <th>Cliente</th>
+                                        <th>Categoria</th>
+                                        <th>Servidor</th>
+                                        <th>Tempo Ativo</th>
+                                        <th>Receita Total</th>
+                                        <th>Valor Mensal</th>
+                                        <th>Última Renovação</th>
+                                        <th>Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="oldest-clients-tbody">
+                                    {% for client in oldest_clients %}
+                                    <tr class="client-row" data-server="{{ client.server or 'UltraPlay' }}" 
+                                        data-plan-type="{{ client.plan_type }}" data-age="{{ client.age_days }}">
+                                        <td>
+                                            <span class="badge bg-info">{{ loop.index }}</span>
+                                        </td>
+                                        <td>
+                                            <strong>{{ client.name }}</strong><br>
+                                            <small class="text-muted">{{ client.phone }}</small>
+                                        </td>
+                                        <td>
+                                            <span class="badge bg-info">{{ client.plan_type }}</span>
+                                        </td>
+                                        <td>
+                                            {% if client.server == 'UltraPlay' %}
+                                                <span class="badge bg-success">🟢 {{ client.server or 'UltraPlay' }}</span>
+                                            {% elif client.server == '4kPlayerPro' %}
+                                                <span class="badge bg-primary">🔵 {{ client.server }}</span>
+                                            {% elif client.server == 'Blaze' %}
+                                                <span class="badge bg-danger">🔴 {{ client.server }}</span>
+                                            {% else %}
+                                                <span class="badge bg-success">🟢 UltraPlay</span>
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            <strong class="text-primary">{{ client.age_days }} dias</strong><br>
+                                            <small class="text-muted">{{ "{:.1f}".format(client.age_days / 30) }} meses</small>
+                                        </td>
+                                        <td>
+                                            <strong class="text-success">R$ {{ "{:.2f}".format(client.total_revenue) }}</strong>
+                                        </td>
+                                        <td>
+                                            <span class="text-primary">R$ {{ "{:.2f}".format(client.monthly_avg) }}</span>
+                                        </td>
+                                        <td>
+                                            {% if client.last_renewal %}
+                                                <small>{{ client.last_renewal_formatted }}</small>
+                                            {% else %}
+                                                <small class="text-muted">Nenhuma</small>
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            <span class="badge bg-{{ client.status_color }}">{{ client.status }}</span>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Server Analysis -->
+            <div class="tab-pane fade" id="server-analysis" role="tabpanel">
+                <div class="row">
+                    {% for server_name, server_data in server_stats.items() %}
+                    <div class="col-md-4 mb-4">
+                        <div class="card glass">
+                            <div class="card-header text-center">
+                                {% if server_name == 'UltraPlay' %}
+                                    <h5 class="text-success">🟢 {{ server_name }}</h5>
+                                {% elif server_name == '4kPlayerPro' %}
+                                    <h5 class="text-primary">🔵 {{ server_name }}</h5>
+                                {% elif server_name == 'Blaze' %}
+                                    <h5 class="text-danger">🔴 {{ server_name }}</h5>
+                                {% endif %}
+                            </div>
+                            <div class="card-body">
+                                <div class="row text-center">
+                                    <div class="col-6 mb-3">
+                                        <h4 class="text-primary">{{ server_data.clients }}</h4>
+                                        <small class="text-muted">Clientes</small>
+                                    </div>
+                                    <div class="col-6 mb-3">
+                                        <h4 class="text-success">R$ {{ "{:.2f}".format(server_data.revenue) }}</h4>
+                                        <small class="text-muted">Receita</small>
+                                    </div>
+                                    <div class="col-6">
+                                        <h5 class="text-info">R$ {{ "{:.2f}".format(server_data.avg_revenue) }}</h5>
+                                        <small class="text-muted">Média/Cliente</small>
+                                    </div>
+                                    <div class="col-6">
+                                        <h5 class="text-warning">{{ "{:.1f}".format(server_data.percentage) }}%</h5>
+                                        <small class="text-muted">% do Total</small>
+                                    </div>
+                                </div>
+                                <hr>
+                                <h6>Por Categoria:</h6>
+                                {% for plan_type, count in server_data.plan_types.items() %}
+                                <div class="d-flex justify-content-between">
+                                    <span>{{ plan_type }}</span>
+                                    <span class="badge bg-secondary">{{ count }}</span>
+                                </div>
+                                {% endfor %}
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <!-- Revenue Analysis -->
+            <div class="tab-pane fade" id="revenue-analysis" role="tabpanel">
+                <div class="row">
+                    <div class="col-md-6 mb-4">
+                        <div class="card glass">
+                            <div class="card-header">
+                                <h6 class="mb-0">Receita por Categoria</h6>
+                            </div>
+                            <div class="card-body">
+                                {% for plan_type, revenue in revenue_by_category.items() %}
+                                <div class="d-flex justify-content-between align-items-center mb-2">
+                                    <span>{{ plan_type }}</span>
+                                    <span class="text-success">R$ {{ "{:.2f}".format(revenue) }}</span>
+                                </div>
+                                <div class="progress mb-3">
+                                    <div class="progress-bar" role="progressbar" 
+                                         style="width: {{ (revenue / stats.total_revenue * 100) if stats.total_revenue > 0 else 0 }}%">
+                                    </div>
+                                </div>
+                                {% endfor %}
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6 mb-4">
+                        <div class="card glass">
+                            <div class="card-header">
+                                <h6 class="mb-0">Métricas de Performance</h6>
+                            </div>
+                            <div class="card-body">
+                                <div class="row text-center">
+                                    <div class="col-6 mb-3">
+                                        <h4 class="text-primary">{{ stats.active_clients }}</h4>
+                                        <small class="text-muted">Clientes Ativos</small>
+                                    </div>
+                                    <div class="col-6 mb-3">
+                                        <h4 class="text-warning">{{ stats.expiring_soon }}</h4>
+                                        <small class="text-muted">Vencendo em 7 dias</small>
+                                    </div>
+                                    <div class="col-6">
+                                        <h4 class="text-danger">{{ stats.expired }}</h4>
+                                        <small class="text-muted">Expirados</small>
+                                    </div>
+                                    <div class="col-6">
+                                        <h4 class="text-success">{{ stats.total_renewals }}</h4>
+                                        <small class="text-muted">Total Renovações</small>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function filterReports() {
+    const serverFilter = document.getElementById('serverFilter').value;
+    const planTypeFilter = document.getElementById('planTypeFilter').value;
+    const timeFilter = parseInt(document.getElementById('timeFilter').value);
+    
+    const rows = document.querySelectorAll('.client-row');
+    
+    rows.forEach(row => {
+        let showRow = true;
+        
+        // Filter by server
+        if (serverFilter !== 'all') {
+            const rowServer = row.getAttribute('data-server');
+            if (rowServer !== serverFilter) {
+                showRow = false;
+            }
+        }
+        
+        // Filter by plan type
+        if (planTypeFilter !== 'all') {
+            const rowPlanType = row.getAttribute('data-plan-type');
+            if (rowPlanType !== planTypeFilter) {
+                showRow = false;
+            }
+        }
+        
+        // Filter by time (age in days)
+        if (!isNaN(timeFilter)) {
+            const rowAge = parseInt(row.getAttribute('data-age'));
+            if (rowAge < timeFilter) {
+                showRow = false;
+            }
+        }
+        
+        row.style.display = showRow ? '' : 'none';
+    });
+}
+
+function resetFilters() {
+    document.getElementById('serverFilter').value = 'all';
+    document.getElementById('planTypeFilter').value = 'all';
+    document.getElementById('timeFilter').value = 'all';
+    filterReports();
+}
+
+// Auto-update filters when tab changes
+document.addEventListener('DOMContentLoaded', function() {
+    const tabButtons = document.querySelectorAll('button[data-bs-toggle="tab"]');
+    tabButtons.forEach(button => {
+        button.addEventListener('shown.bs.tab', function() {
+            filterReports();
+        });
+    });
+});
+</script>
+{% endblock %}

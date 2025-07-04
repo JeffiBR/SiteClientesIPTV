@@ -40,15 +40,28 @@
 
                     <!-- Plan Information -->
                     <div class="row mb-3">
-                        <div class="col-md-6">
-                            <label for="plan_type" class="form-label">Tipo de Plano *</label>
+                        <div class="col-md-4">
+                            <label for="plan_type" class="form-label">Categoria do Plano *</label>
                             <select class="form-select" id="plan_type" name="plan_type" required>
-                                <option value="">Selecione o tipo</option>
-                                <option value="IPTV" {% if client.plan_type == 'IPTV' %}selected{% endif %}>IPTV</option>
-                                <option value="VPN" {% if client.plan_type == 'VPN' %}selected{% endif %}>VPN</option>
+                                <option value="">Selecione a categoria</option>
+                                <option value="IPTV" {% if client.plan_type == 'IPTV' %}selected{% endif %}>📺 IPTV</option>
+                                <option value="VPN" {% if client.plan_type == 'VPN' %}selected{% endif %}>🔒 VPN</option>
+                                <option value="STREAMING" {% if client.plan_type == 'STREAMING' %}selected{% endif %}>🎬 STREAMING</option>
+                                <option value="GAMING" {% if client.plan_type == 'GAMING' %}selected{% endif %}>🎮 GAMING</option>
+                                <option value="INTERNET" {% if client.plan_type == 'INTERNET' %}selected{% endif %}>🌐 INTERNET</option>
+                                <option value="OUTROS" {% if client.plan_type == 'OUTROS' %}selected{% endif %}>⚙️ OUTROS</option>
                             </select>
                         </div>
-                        <div class="col-md-6">
+                        <div class="col-md-4">
+                            <label for="server" class="form-label">Servidor *</label>
+                            <select class="form-select" id="server" name="server" required>
+                                <option value="">Selecione o servidor</option>
+                                <option value="UltraPlay" {% if client.server == 'UltraPlay' %}selected{% endif %}>🟢 UltraPlay</option>
+                                <option value="4kPlayerPro" {% if client.server == '4kPlayerPro' %}selected{% endif %}>🔵 4kPlayerPro</option>
+                                <option value="Blaze" {% if client.server == 'Blaze' %}selected{% endif %}>🔴 Blaze</option>
+                            </select>
+                        </div>
+                        <div class="col-md-4">
                             <label for="value" class="form-label">Valor do Plano (R$) *</label>
                             <input type="number" class="form-control" id="value" name="value" 
                                    value="{{ client.value }}" step="0.01" min="0" required>
