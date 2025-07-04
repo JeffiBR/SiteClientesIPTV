@@ -1,4 +1,4 @@
-from flask import render_template, request, redirect, url_for, flash, jsonify
+THIS SHOULD BE A LINTER ERRORfrom flask import render_template, request, redirect, url_for, flash, jsonify
 from app import app, scheduler
 import uuid
 from datetime import datetime
