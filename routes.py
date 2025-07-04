@@ -1,4 +1,4 @@
-THIS SHOULD BE A LINTER ERRORfrom flask import render_template, request, redirect, url_for, flash, jsonify
+from flask import render_template, request, redirect, url_for, flash, jsonify
 from app import app, scheduler
 import uuid
 from datetime import datetime
@@ -13,6 +13,7 @@ from rate_limiter import rate_limiter, get_client_ip
 from logger_config import log_user_action, log_with_context, app_logger, client_logger
 from simple_cache import cache_dashboard_stats, cache_client_list, app_cache, invalidate_cache_pattern
 from backup_utils import create_backup, backup_manager
+from ai_integration import AIMessageGenerator
 import logging
 
 logger = logging.getLogger(__name__)
@@ -113,7 +114,7 @@ def add_client():
     client_ip = get_client_ip()
     
     # Simple rate limiting check
-    if not rate_limit_form(limit=10).is_allowed(client_ip):
+    if not rate_limiter.is_allowed(client_ip, limit=10):
         flash('Muitas tentativas. Aguarde alguns minutos.', 'error')
         return redirect(url_for('clients'))
     
@@ -216,7 +217,7 @@ def delete_client(client_id):
     client_ip = get_client_ip()
     
     # Rate limiting for sensitive action
-    if not rate_limit_sensitive(limit=5).is_allowed(client_ip):
+    if not rate_limiter.is_allowed(client_ip, limit=5):
         flash('Muitas tentativas de exclusão. Aguarde.', 'error')
         return redirect(url_for('clients'))
     
@@ -262,7 +263,7 @@ def renew_client(client_id):
     client_ip = get_client_ip()
     
     # Rate limiting for form action
-    if not rate_limit_form(limit=20).is_allowed(client_ip):
+    if not rate_limiter.is_allowed(client_ip, limit=20):
         flash('Muitas tentativas de renovação. Aguarde.', 'error')
         return redirect(url_for('clients'))
     
@@ -580,7 +581,7 @@ def api_cache_stats():
     client_ip = get_client_ip()
     
     # Manual rate limiting
-    if not rate_limit_api(limit=30).is_allowed(client_ip):
+    if not rate_limiter.is_allowed(client_ip, limit=30):
         return jsonify({'error': 'Rate limit exceeded'}), 429
     
     try:
@@ -599,7 +600,7 @@ def api_create_backup():
     client_ip = get_client_ip()
     
     # Manual rate limiting for sensitive action
-    if not rate_limit_sensitive(limit=2).is_allowed(client_ip):
+    if not rate_limiter.is_allowed(client_ip, limit=2):
         return jsonify({'error': 'Rate limit exceeded for backup creation'}), 429
     
     try:
@@ -632,7 +633,7 @@ def api_list_backups():
     client_ip = get_client_ip()
     
     # Manual rate limiting
-    if not rate_limit_api(limit=20).is_allowed(client_ip):
+    if not rate_limiter.is_allowed(client_ip, limit=20):
         return jsonify({'error': 'Rate limit exceeded'}), 429
     
     try:
@@ -720,7 +721,7 @@ def api_vpn_stats():
     client_ip = get_client_ip()
     
     # Rate limiting
-    if not rate_limit_api(limit=30).is_allowed(client_ip):
+    if not rate_limiter.is_allowed(client_ip, limit=30):
         return jsonify({'error': 'Rate limit exceeded'}), 429
     
     try:
@@ -776,7 +777,7 @@ def api_vpn_clients():
     client_ip = get_client_ip()
     
     # Rate limiting
-    if not rate_limit_api(limit=20).is_allowed(client_ip):
+    if not rate_limiter.is_allowed(client_ip, limit=20):
         return jsonify({'error': 'Rate limit exceeded'}), 429
     
     try:
@@ -841,7 +842,7 @@ def api_mobile_dashboard():
     client_ip = get_client_ip()
     
     # Rate limiting
-    if not rate_limit_api(limit=60).is_allowed(client_ip):
+    if not rate_limiter.is_allowed(client_ip, limit=60):
         return jsonify({'error': 'Rate limit exceeded'}), 429
     
     try:
@@ -904,7 +905,7 @@ def api_revenue_trend():
     client_ip = get_client_ip()
     
     # Rate limiting
-    if not rate_limit_api(limit=10).is_allowed(client_ip):
+    if not rate_limiter.is_allowed(client_ip, limit=10):
         return jsonify({'error': 'Rate limit exceeded'}), 429
     
     try:
@@ -952,7 +953,7 @@ def api_realtime_updates():
     client_ip = get_client_ip()
     
     # Rate limiting for frequent polling
-    if not rate_limit_api(limit=120).is_allowed(client_ip):
+    if not rate_limiter.is_allowed(client_ip, limit=120):
         return jsonify({'error': 'Rate limit exceeded'}), 429
     
     try:

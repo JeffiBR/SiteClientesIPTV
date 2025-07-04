@@ -1,0 +1,610 @@
+{% extends "base.html" %}
+
+{% block title %}Configuração de IA - Bot Cliente Manager{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h1 class="animate-slideInUp">
+                <i class="bi bi-robot text-gradient"></i>
+                Configuração de IA
+            </h1>
+            <div class="d-flex gap-2">
+                <button class="btn btn-outline-primary" onclick="testAiConnection()">
+                    <i class="bi bi-play-circle"></i>
+                    Testar IA
+                </button>
+                <a href="{{ url_for('dashboard') }}" class="btn btn-secondary">
+                    <i class="bi bi-arrow-left"></i>
+                    Voltar
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<form method="POST" id="aiConfigForm">
+    <div class="row">
+        <!-- Configurações Principais -->
+        <div class="col-lg-8">
+            <div class="card glass animate-slideInUp mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="bi bi-gear-fill me-2 text-primary"></i>
+                        Configurações Principais
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <!-- Provider Selection -->
+                    <div class="mb-4">
+                        <label for="provider" class="form-label">
+                            <i class="bi bi-cloud-arrow-up me-2"></i>Provedor de IA
+                        </label>
+                        <select class="form-select" id="provider" name="provider" onchange="updateProviderConfig()">
+                            <option value="openrouter" {{ 'selected' if config.provider == 'openrouter' else '' }}>
+                                🚀 OpenRouter (Recomendado)
+                            </option>
+                            <option value="openai" {{ 'selected' if config.provider == 'openai' else '' }}>
+                                🤖 OpenAI
+                            </option>
+                            <option value="anthropic" {{ 'selected' if config.provider == 'anthropic' else '' }}>
+                                🧠 Anthropic Claude
+                            </option>
+                            <option value="custom" {{ 'selected' if config.provider == 'custom' else '' }}>
+                                ⚙️ Personalizado
+                            </option>
+                        </select>
+                        <div class="form-text">
+                            <i class="bi bi-info-circle me-1"></i>
+                            OpenRouter oferece acesso a múltiplos modelos com preços competitivos
+                        </div>
+                    </div>
+
+                    <!-- API Configuration -->
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label for="api_key" class="form-label">
+                                <i class="bi bi-key-fill me-2"></i>Chave da API
+                            </label>
+                            <div class="input-group">
+                                <input type="password" class="form-control" id="api_key" name="api_key" 
+                                       value="{{ config.api_key }}" placeholder="sk-...">
+                                <button class="btn btn-outline-secondary" type="button" onclick="toggleApiKey()">
+                                    <i class="bi bi-eye" id="apiKeyIcon"></i>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="model" class="form-label">
+                                <i class="bi bi-cpu me-2"></i>Modelo
+                            </label>
+                            <select class="form-select" id="model" name="model">
+                                <!-- OpenRouter Models -->
+                                <optgroup label="🚀 OpenRouter - Gratuitos" id="openrouter-free">
+                                    <option value="qwen/qwen-2.5-72b-instruct:free" {{ 'selected' if config.model == 'qwen/qwen-2.5-72b-instruct:free' else '' }}>
+                                        Qwen 2.5 72B (Grátis)
+                                    </option>
+                                    <option value="meta-llama/llama-3.1-8b-instruct:free" {{ 'selected' if config.model == 'meta-llama/llama-3.1-8b-instruct:free' else '' }}>
+                                        Llama 3.1 8B (Grátis)
+                                    </option>
+                                </optgroup>
+                                <optgroup label="🚀 OpenRouter - Premium" id="openrouter-premium">
+                                    <option value="gpt-4o-mini" {{ 'selected' if config.model == 'gpt-4o-mini' else '' }}>
+                                        GPT-4o Mini
+                                    </option>
+                                    <option value="claude-3-haiku" {{ 'selected' if config.model == 'claude-3-haiku' else '' }}>
+                                        Claude 3 Haiku
+                                    </option>
+                                </optgroup>
+                                <!-- OpenAI Models -->
+                                <optgroup label="🤖 OpenAI" id="openai-models" style="display: none;">
+                                    <option value="gpt-4o-mini">GPT-4o Mini</option>
+                                    <option value="gpt-4o">GPT-4o</option>
+                                    <option value="gpt-3.5-turbo">GPT-3.5 Turbo</option>
+                                </optgroup>
+                                <!-- Anthropic Models -->
+                                <optgroup label="🧠 Anthropic" id="anthropic-models" style="display: none;">
+                                    <option value="claude-3-haiku-20240307">Claude 3 Haiku</option>
+                                    <option value="claude-3-sonnet-20240229">Claude 3 Sonnet</option>
+                                </optgroup>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- Custom URL (for custom provider) -->
+                    <div class="mb-3" id="customUrlField" style="display: none;">
+                        <label for="base_url" class="form-label">
+                            <i class="bi bi-link me-2"></i>URL Base da API
+                        </label>
+                        <input type="url" class="form-control" id="base_url" name="base_url" 
+                               value="{{ config.base_url }}" placeholder="https://api.exemplo.com/v1">
+                    </div>
+
+                    <!-- Advanced Settings -->
+                    <div class="row mb-3">
+                        <div class="col-md-4">
+                            <label for="max_tokens" class="form-label">
+                                <i class="bi bi-type me-2"></i>Max Tokens
+                            </label>
+                            <input type="number" class="form-control" id="max_tokens" name="max_tokens" 
+                                   value="{{ config.max_tokens }}" min="50" max="4000">
+                        </div>
+                        <div class="col-md-4">
+                            <label for="temperature" class="form-label">
+                                <i class="bi bi-thermometer-half me-2"></i>Criatividade
+                            </label>
+                            <input type="range" class="form-range" id="temperature" name="temperature" 
+                                   value="{{ config.temperature }}" min="0" max="1" step="0.1" 
+                                   oninput="updateTemperatureDisplay(this.value)">
+                            <div class="form-text">
+                                <span id="temperatureDisplay">{{ config.temperature }}</span> 
+                                (<span id="temperatureLabel">{{ 'Conservadora' if config.temperature < 0.4 else 'Equilibrada' if config.temperature < 0.8 else 'Criativa' }}</span>)
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <label for="max_message_length" class="form-label">
+                                <i class="bi bi-chat-square-text me-2"></i>Tamanho Max
+                            </label>
+                            <input type="number" class="form-control" id="max_message_length" name="max_message_length" 
+                                   value="{{ config.max_message_length }}" min="50" max="500">
+                        </div>
+                    </div>
+
+                    <!-- Enable/Disable Toggle -->
+                    <div class="mb-3">
+                        <div class="form-check form-switch">
+                            <input class="form-check-input" type="checkbox" id="enabled" name="enabled" 
+                                   {{ 'checked' if config.enabled else '' }}>
+                            <label class="form-check-label fw-bold" for="enabled">
+                                <i class="bi bi-power text-success me-2"></i>
+                                Ativar IA para geração automática de mensagens
+                            </label>
+                        </div>
+                        <div class="form-text">
+                            <i class="bi bi-info-circle me-1"></i>
+                            Quando ativada, a IA gerará mensagens personalizadas automaticamente
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Personalidade da IA -->
+            <div class="card glass animate-slideInUp mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="bi bi-person-hearts me-2 text-info"></i>
+                        Personalidade da IA
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <label for="personality" class="form-label">Estilo de Personalidade</label>
+                        <select class="form-select" id="personality" name="personality" onchange="updatePersonalityDescription()">
+                            <option value="professional" {{ 'selected' if config.personality == 'professional' else '' }}>
+                                💼 Profissional
+                            </option>
+                            <option value="friendly" {{ 'selected' if config.personality == 'friendly' else '' }}>
+                                😊 Amigável
+                            </option>
+                            <option value="casual" {{ 'selected' if config.personality == 'casual' else '' }}>
+                                👋 Casual
+                            </option>
+                            <option value="formal" {{ 'selected' if config.personality == 'formal' else '' }}>
+                                🎩 Formal
+                            </option>
+                            <option value="energetic" {{ 'selected' if config.personality == 'energetic' else '' }}>
+                                ⚡ Enérgico
+                            </option>
+                            <option value="custom" {{ 'selected' if config.personality == 'custom' else '' }}>
+                                ⚙️ Personalizado
+                            </option>
+                        </select>
+                    </div>
+
+                    <div class="alert alert-info" id="personalityDescription">
+                        <i class="bi bi-lightbulb me-2"></i>
+                        <span id="personalityText">Mensagens com tom profissional e direto</span>
+                    </div>
+
+                    <!-- Custom Personality -->
+                    <div class="mb-3" id="customPersonalityField" style="display: none;">
+                        <label for="custom_personality" class="form-label">Personalidade Personalizada</label>
+                        <textarea class="form-control" id="custom_personality" name="custom_personality" rows="3" 
+                                  placeholder="Descreva como a IA deve se comportar...">{{ config.custom_personality }}</textarea>
+                    </div>
+
+                    <!-- Message Style -->
+                    <div class="mb-3">
+                        <label for="message_style" class="form-label">Estilo das Mensagens</label>
+                        <select class="form-select" id="message_style" name="message_style">
+                            <option value="friendly" {{ 'selected' if config.message_style == 'friendly' else '' }}>
+                                😊 Amigável e acolhedor
+                            </option>
+                            <option value="professional" {{ 'selected' if config.message_style == 'professional' else '' }}>
+                                💼 Profissional e direto
+                            </option>
+                            <option value="persuasive" {{ 'selected' if config.message_style == 'persuasive' else '' }}>
+                                🎯 Persuasivo
+                            </option>
+                            <option value="informative" {{ 'selected' if config.message_style == 'informative' else '' }}>
+                                📋 Informativo
+                            </option>
+                        </select>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="include_emojis" name="include_emojis" 
+                                       {{ 'checked' if config.include_emojis else '' }}>
+                                <label class="form-check-label" for="include_emojis">
+                                    😀 Incluir emojis nas mensagens
+                                </label>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="fallback_to_templates" name="fallback_to_templates" 
+                                       {{ 'checked' if config.fallback_to_templates else '' }}>
+                                <label class="form-check-label" for="fallback_to_templates">
+                                    🔄 Usar templates se IA falhar
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Instruções Personalizadas -->
+            <div class="card glass animate-slideInUp">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="bi bi-text-paragraph me-2 text-warning"></i>
+                        Instruções Personalizadas
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <label for="custom_instructions" class="form-label">Instruções Específicas para a IA</label>
+                        <textarea class="form-control" id="custom_instructions" name="custom_instructions" rows="4" 
+                                  placeholder="Exemplo: Sempre mencione promoções, use linguagem brasileira, seja educado...">{{ config.custom_instructions }}</textarea>
+                        <div class="form-text">
+                            <i class="bi bi-info-circle me-1"></i>
+                            Instruções específicas que a IA deve seguir ao gerar mensagens
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6">
+                            <label for="language" class="form-label">Idioma das Mensagens</label>
+                            <select class="form-select" id="language" name="language">
+                                <option value="pt-BR" {{ 'selected' if config.language == 'pt-BR' else '' }}>🇧🇷 Português (Brasil)</option>
+                                <option value="en-US" {{ 'selected' if config.language == 'en-US' else '' }}>🇺🇸 English (US)</option>
+                                <option value="es-ES" {{ 'selected' if config.language == 'es-ES' else '' }}>🇪🇸 Español</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Preview e Status -->
+        <div class="col-lg-4">
+            <!-- Status da IA -->
+            <div class="card glass animate-slideInUp mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="bi bi-activity me-2"></i>
+                        Status da IA
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="status-indicator mb-3" id="aiStatus">
+                        <div class="status-dot bg-secondary"></div>
+                        <span>Não configurada</span>
+                    </div>
+                    
+                    <div class="row text-center">
+                        <div class="col-6">
+                            <h6 class="text-muted">Mensagens Geradas</h6>
+                            <h4 class="text-primary">{{ ai_stats.messages_generated or 0 }}</h4>
+                        </div>
+                        <div class="col-6">
+                            <h6 class="text-muted">Taxa de Sucesso</h6>
+                            <h4 class="text-success">{{ ai_stats.success_rate or '0%' }}</h4>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Preview de Mensagem -->
+            <div class="card glass animate-slideInUp mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="bi bi-eye me-2"></i>
+                        Preview de Mensagem
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <label class="form-label">Categoria do Cliente:</label>
+                        <select class="form-select" id="previewCategory" onchange="generatePreview()">
+                            <option value="IPTV">IPTV</option>
+                            <option value="VPN">VPN</option>
+                            <option value="STREAMING">STREAMING</option>
+                            <option value="GAMING">GAMING</option>
+                        </select>
+                    </div>
+                    
+                    <div class="alert alert-light" id="messagePreview">
+                        <i class="bi bi-chat-dots-fill me-2"></i>
+                        <em>Configure a IA para ver um preview...</em>
+                    </div>
+                    
+                    <button type="button" class="btn btn-outline-primary btn-sm w-100" onclick="generatePreview()">
+                        <i class="bi bi-arrow-clockwise me-2"></i>Gerar Preview
+                    </button>
+                </div>
+            </div>
+
+            <!-- Configurações por Categoria -->
+            <div class="card glass animate-slideInUp">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="bi bi-tags me-2"></i>
+                        Mensagens por Categoria
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="form-text mb-3">
+                        <i class="bi bi-info-circle me-1"></i>
+                        A IA gerará mensagens específicas para cada tipo de plano
+                    </div>
+                    
+                    <div class="category-examples">
+                        <div class="mb-2">
+                            <span class="badge bg-primary">IPTV</span>
+                            <small class="text-muted">Foco em canais e qualidade</small>
+                        </div>
+                        <div class="mb-2">
+                            <span class="badge bg-info">VPN</span>
+                            <small class="text-muted">Ênfase em segurança e privacidade</small>
+                        </div>
+                        <div class="mb-2">
+                            <span class="badge bg-success">STREAMING</span>
+                            <small class="text-muted">Destaque para entretenimento</small>
+                        </div>
+                        <div class="mb-2">
+                            <span class="badge bg-warning">GAMING</span>
+                            <small class="text-muted">Foco em performance e velocidade</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Action Buttons -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card glass animate-slideInUp">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h6 class="mb-1">Salvar Configurações</h6>
+                            <small class="text-muted">As configurações serão salvas no GitHub automaticamente</small>
+                        </div>
+                        <div class="d-flex gap-2">
+                            <button type="button" class="btn btn-outline-secondary" onclick="resetToDefaults()">
+                                <i class="bi bi-arrow-clockwise me-2"></i>Restaurar Padrões
+                            </button>
+                            <button type="submit" class="btn btn-success btn-lg">
+                                <i class="bi bi-save me-2"></i>Salvar Configurações
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</form>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// AI Configuration JavaScript
+function updateProviderConfig() {
+    const provider = document.getElementById('provider').value;
+    const customUrlField = document.getElementById('customUrlField');
+    const openrouterFree = document.getElementById('openrouter-free');
+    const openrouterPremium = document.getElementById('openrouter-premium');
+    const openaiModels = document.getElementById('openai-models');
+    const anthropicModels = document.getElementById('anthropic-models');
+    
+    // Reset visibility
+    [openrouterFree, openrouterPremium, openaiModels, anthropicModels].forEach(el => {
+        el.style.display = 'none';
+    });
+    
+    // Show relevant model groups
+    switch(provider) {
+        case 'openrouter':
+            openrouterFree.style.display = 'block';
+            openrouterPremium.style.display = 'block';
+            customUrlField.style.display = 'none';
+            break;
+        case 'openai':
+            openaiModels.style.display = 'block';
+            customUrlField.style.display = 'none';
+            break;
+        case 'anthropic':
+            anthropicModels.style.display = 'block';
+            customUrlField.style.display = 'none';
+            break;
+        case 'custom':
+            customUrlField.style.display = 'block';
+            break;
+    }
+}
+
+function updatePersonalityDescription() {
+    const personality = document.getElementById('personality').value;
+    const customField = document.getElementById('customPersonalityField');
+    const descriptions = {
+        'professional': 'Mensagens com tom profissional e direto',
+        'friendly': 'Mensagens amigáveis e calorosas',
+        'casual': 'Linguagem descontraída e informal',
+        'formal': 'Tom formal e respeitoso',
+        'energetic': 'Mensagens animadas e motivadoras',
+        'custom': 'Personalidade definida por você'
+    };
+    
+    document.getElementById('personalityText').textContent = descriptions[personality];
+    customField.style.display = personality === 'custom' ? 'block' : 'none';
+}
+
+function updateTemperatureDisplay(value) {
+    document.getElementById('temperatureDisplay').textContent = value;
+    const labels = value < 0.4 ? 'Conservadora' : value < 0.8 ? 'Equilibrada' : 'Criativa';
+    document.getElementById('temperatureLabel').textContent = labels;
+}
+
+function toggleApiKey() {
+    const apiKeyField = document.getElementById('api_key');
+    const icon = document.getElementById('apiKeyIcon');
+    
+    if (apiKeyField.type === 'password') {
+        apiKeyField.type = 'text';
+        icon.className = 'bi bi-eye-slash';
+    } else {
+        apiKeyField.type = 'password';
+        icon.className = 'bi bi-eye';
+    }
+}
+
+function generatePreview() {
+    const category = document.getElementById('previewCategory').value;
+    const previewDiv = document.getElementById('messagePreview');
+    const enabled = document.getElementById('enabled').checked;
+    
+    if (!enabled) {
+        previewDiv.innerHTML = '<i class="bi bi-info-circle me-2"></i><em>Ative a IA para gerar preview</em>';
+        return;
+    }
+    
+    previewDiv.innerHTML = '<i class="bi bi-hourglass-split me-2"></i><em>Gerando preview...</em>';
+    
+    // Simulate API call
+    setTimeout(() => {
+        const previews = {
+            'IPTV': '📺 Olá! Seu plano IPTV vence em 3 dias. Renove agora e continue aproveitando todos os seus canais favoritos com qualidade HD!',
+            'VPN': '🔒 Sua VPN expira em 3 dias. Mantenha sua privacidade e segurança online renovando seu plano agora!',
+            'STREAMING': '🎬 Não perca seus filmes e séries! Seu plano de streaming vence em 3 dias. Renove e continue assistindo!',
+            'GAMING': '🎮 Gamer, seu plano está prestes a vencer! Renove agora e mantenha sua conexão rápida para os games!'
+        };
+        
+        previewDiv.innerHTML = `<i class="bi bi-chat-dots-fill me-2"></i>${previews[category]}`;
+    }, 1500);
+}
+
+function testAiConnection() {
+    const form = document.getElementById('aiConfigForm');
+    const formData = new FormData(form);
+    
+    // Show loading state
+    const btn = event.target;
+    const originalText = btn.innerHTML;
+    btn.innerHTML = '<i class="bi bi-hourglass-split me-2"></i>Testando...';
+    btn.disabled = true;
+    
+    fetch('/ai/test-connection', {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert('✅ Conexão com IA testada com sucesso!\n\nResposta: ' + data.response);
+        } else {
+            alert('❌ Erro ao testar IA:\n\n' + data.error);
+        }
+    })
+    .catch(error => {
+        alert('❌ Erro de conexão: ' + error.message);
+    })
+    .finally(() => {
+        btn.innerHTML = originalText;
+        btn.disabled = false;
+    });
+}
+
+function resetToDefaults() {
+    if (confirm('Tem certeza que deseja restaurar as configurações padrão?')) {
+        document.getElementById('provider').value = 'openrouter';
+        document.getElementById('model').value = 'qwen/qwen-2.5-72b-instruct:free';
+        document.getElementById('temperature').value = '0.7';
+        document.getElementById('max_tokens').value = '200';
+        document.getElementById('personality').value = 'professional';
+        document.getElementById('enabled').checked = false;
+        updateProviderConfig();
+        updatePersonalityDescription();
+        updateTemperatureDisplay('0.7');
+    }
+}
+
+// Initialize on page load
+document.addEventListener('DOMContentLoaded', function() {
+    updateProviderConfig();
+    updatePersonalityDescription();
+    
+    // Update AI status based on configuration
+    const enabled = document.getElementById('enabled').checked;
+    const apiKey = document.getElementById('api_key').value;
+    const statusDiv = document.getElementById('aiStatus');
+    
+    if (enabled && apiKey) {
+        statusDiv.innerHTML = '<div class="status-dot bg-success"></div><span>Configurada e ativa</span>';
+    } else if (apiKey) {
+        statusDiv.innerHTML = '<div class="status-dot bg-warning"></div><span>Configurada mas inativa</span>';
+    } else {
+        statusDiv.innerHTML = '<div class="status-dot bg-secondary"></div><span>Não configurada</span>';
+    }
+});
+</script>
+
+<style>
+.status-indicator {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.status-dot {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+    0% { opacity: 1; }
+    50% { opacity: 0.5; }
+    100% { opacity: 1; }
+}
+
+.category-examples .badge {
+    font-size: 0.75em;
+    margin-right: 8px;
+}
+
+.form-range::-webkit-slider-thumb {
+    background: var(--bs-primary);
+}
+
+.form-range::-moz-range-thumb {
+    background: var(--bs-primary);
+    border: none;
+}
+</style>
+{% endblock %}
