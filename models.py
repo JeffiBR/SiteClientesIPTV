@@ -206,3 +206,146 @@ DEFAULT_TEMPLATES = [
         'plan_type': 'VPN'
     }
 ]
+
+class AIConfiguration:
+    def __init__(self, 
+                 provider: str = "openrouter",
+                 api_key: str = "",
+                 model: str = "qwen/qwen-2.5-72b-instruct:free",
+                 base_url: str = "",
+                 max_tokens: int = 200,
+                 temperature: float = 0.7,
+                 personality: str = "professional",
+                 custom_personality: str = "",
+                 message_style: str = "friendly",
+                 include_emojis: bool = True,
+                 max_message_length: int = 150,
+                 language: str = "pt-BR",
+                 custom_instructions: str = "",
+                 enabled: bool = False,
+                 fallback_to_templates: bool = True,
+                 created_at: Optional[str] = None,
+                 updated_at: Optional[str] = None):
+        
+        self.provider = provider  # openrouter, openai, anthropic, local
+        self.api_key = api_key
+        self.model = model
+        self.base_url = base_url
+        self.max_tokens = max_tokens
+        self.temperature = temperature
+        self.personality = personality  # professional, friendly, casual, formal
+        self.custom_personality = custom_personality
+        self.message_style = message_style  # friendly, formal, urgent, casual
+        self.include_emojis = include_emojis
+        self.max_message_length = max_message_length
+        self.language = language
+        self.custom_instructions = custom_instructions
+        self.enabled = enabled
+        self.fallback_to_templates = fallback_to_templates
+        self.created_at = created_at or datetime.now().isoformat()
+        self.updated_at = updated_at or datetime.now().isoformat()
+    
+    def to_dict(self) -> Dict:
+        return {
+            'provider': self.provider,
+            'api_key': self.api_key,
+            'model': self.model,
+            'base_url': self.base_url,
+            'max_tokens': self.max_tokens,
+            'temperature': self.temperature,
+            'personality': self.personality,
+            'custom_personality': self.custom_personality,
+            'message_style': self.message_style,
+            'include_emojis': self.include_emojis,
+            'max_message_length': self.max_message_length,
+            'language': self.language,
+            'custom_instructions': self.custom_instructions,
+            'enabled': self.enabled,
+            'fallback_to_templates': self.fallback_to_templates,
+            'created_at': self.created_at,
+            'updated_at': self.updated_at
+        }
+    
+    @classmethod
+    def from_dict(cls, data: Dict) -> 'AIConfiguration':
+        return cls(**data)
+    
+    def update_timestamp(self):
+        """Atualiza o timestamp de modificação"""
+        self.updated_at = datetime.now().isoformat()
+    
+    def get_personality_prompt(self) -> str:
+        """Retorna o prompt de personalidade baseado na configuração"""
+        personalities = {
+            "professional": "Você é um assistente profissional e cortês. Use linguagem formal e seja sempre respeitoso.",
+            "friendly": "Você é um assistente amigável e caloroso. Use um tom acolhedor e próximo, mas mantendo profissionalismo.",
+            "casual": "Você é um assistente descontraído e informal. Use linguagem coloquial e seja mais direto.",
+            "formal": "Você é um assistente extremamente formal e educado. Use linguagem rebuscada e cerimoniosa.",
+            "custom": self.custom_personality
+        }
+        
+        base_prompt = personalities.get(self.personality, personalities["professional"])
+        
+        style_additions = {
+            "friendly": " Seja cordial e acolhedor em suas mensagens.",
+            "formal": " Mantenha sempre um tom sério e respeitoso.",
+            "urgent": " Transmita senso de urgência quando necessário, mas sem ser agressivo.",
+            "casual": " Seja mais relaxado e direto na comunicação."
+        }
+        
+        full_prompt = base_prompt + style_additions.get(self.message_style, "")
+        
+        if self.custom_instructions:
+            full_prompt += f" Instruções adicionais: {self.custom_instructions}"
+        
+        if not self.include_emojis:
+            full_prompt += " IMPORTANTE: Não use emojis nas mensagens."
+        
+        full_prompt += f" Mantenha as mensagens com no máximo {self.max_message_length} caracteres."
+        
+        return full_prompt
+
+# Configuração padrão de IA
+DEFAULT_AI_CONFIG = {
+    'provider': 'openrouter',
+    'api_key': '',
+    'model': 'qwen/qwen-2.5-72b-instruct:free',
+    'base_url': 'https://openrouter.ai/api/v1/chat/completions',
+    'max_tokens': 200,
+    'temperature': 0.7,
+    'personality': 'friendly',
+    'custom_personality': '',
+    'message_style': 'friendly',
+    'include_emojis': True,
+    'max_message_length': 150,
+    'language': 'pt-BR',
+    'custom_instructions': '',
+    'enabled': False,
+    'fallback_to_templates': True
+}
+
+# Modelos disponíveis por provedor
+AI_MODELS = {
+    'openrouter': [
+        {'name': 'qwen/qwen-2.5-72b-instruct:free', 'display': 'Qwen 2.5 72B (Gratuito)', 'free': True},
+        {'name': 'meta-llama/llama-3.1-8b-instruct:free', 'display': 'Llama 3.1 8B (Gratuito)', 'free': True},
+        {'name': 'microsoft/wizardlm-2-8x22b:free', 'display': 'WizardLM 2 8x22B (Gratuito)', 'free': True},
+        {'name': 'openai/gpt-4o', 'display': 'GPT-4o (Pago)', 'free': False},
+        {'name': 'anthropic/claude-3.5-sonnet', 'display': 'Claude 3.5 Sonnet (Pago)', 'free': False},
+        {'name': 'google/gemini-pro-1.5', 'display': 'Gemini Pro 1.5 (Pago)', 'free': False}
+    ],
+    'openai': [
+        {'name': 'gpt-4o', 'display': 'GPT-4o', 'free': False},
+        {'name': 'gpt-4o-mini', 'display': 'GPT-4o Mini', 'free': False},
+        {'name': 'gpt-3.5-turbo', 'display': 'GPT-3.5 Turbo', 'free': False}
+    ],
+    'anthropic': [
+        {'name': 'claude-3-5-sonnet-20241022', 'display': 'Claude 3.5 Sonnet', 'free': False},
+        {'name': 'claude-3-haiku-20240307', 'display': 'Claude 3 Haiku', 'free': False}
+    ],
+    'local': [
+        {'name': 'llama2', 'display': 'Llama 2 (Ollama)', 'free': True},
+        {'name': 'mistral', 'display': 'Mistral (Ollama)', 'free': True},
+        {'name': 'codellama', 'display': 'Code Llama (Ollama)', 'free': True}
+    ]
+}

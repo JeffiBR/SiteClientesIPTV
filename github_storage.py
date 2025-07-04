@@ -5,7 +5,7 @@ import base64
 import time
 import threading
 from typing import List, Dict, Optional
-from models import Client, MessageTemplate, DEFAULT_TEMPLATES
+from models import Client, MessageTemplate, DEFAULT_TEMPLATES, DEFAULT_AI_CONFIG
 import logging
 import traceback
 from datetime import datetime, timedelta
@@ -637,6 +637,268 @@ class GitHubStorage:
     def get_dev_mode(self) -> bool:
         """Check if running in development mode"""
         return self.dev_mode
+
+    def get_ai_configuration(self) -> Dict:
+        """Get AI configuration from GitHub storage with fallback to defaults"""
+        try:
+            file_data = self._get_file_content('ai_config.json')
+            
+            if not file_data:
+                logger.info("No ai_config.json found, returning default configuration")
+                return self._get_default_ai_config()
+            
+            content = file_data.get('content', {})
+            
+            # Validate configuration
+            if not isinstance(content, dict):
+                logger.warning("Invalid AI config format, returning defaults")
+                return self._get_default_ai_config()
+            
+            # Merge with defaults to ensure all keys exist
+            config = DEFAULT_AI_CONFIG.copy()
+            config.update(content)
+            
+            logger.info("Loaded AI configuration from storage")
+            return config
+            
+        except Exception as e:
+            logger.error(f"Error loading AI configuration: {str(e)}")
+            return self._get_default_ai_config()
+    
+    def save_ai_configuration(self, config: Dict) -> bool:
+        """Save AI configuration to GitHub storage"""
+        try:
+            # Validate configuration
+            required_keys = set(DEFAULT_AI_CONFIG.keys())
+            config_keys = set(config.keys())
+            
+            if not required_keys.issubset(config_keys):
+                missing_keys = required_keys - config_keys
+                logger.error(f"Missing required AI config keys: {missing_keys}")
+                return False
+            
+            # Get current file SHA
+            file_data = self._get_file_content('ai_config.json')
+            sha = file_data.get('sha') if file_data else None
+            
+            # Add timestamp
+            config['updated_at'] = datetime.now().isoformat()
+            
+            success = self._save_file_content('ai_config.json', config, sha)
+            
+            if success:
+                logger.info("Successfully saved AI configuration")
+            else:
+                logger.error("Failed to save AI configuration")
+            
+            return success
+            
+        except Exception as e:
+            logger.error(f"Error saving AI configuration: {str(e)}")
+            return False
+    
+    def _get_default_ai_config(self) -> Dict:
+        """Get default AI configuration"""
+        config = DEFAULT_AI_CONFIG.copy()
+        
+        # Try to get API key from environment
+        if not config.get('api_key'):
+            config['api_key'] = os.getenv('OPENROUTER_API_KEY', '')
+        
+        return config
+    
+    def test_ai_configuration(self, config: Dict) -> Dict:
+        """Test AI configuration and return status"""
+        try:
+            if not config.get('enabled'):
+                return {
+                    'status': 'disabled',
+                    'message': 'Configuração de IA está desabilitada'
+                }
+            
+            if not config.get('api_key'):
+                return {
+                    'status': 'error',
+                    'message': 'API Key não configurada'
+                }
+            
+            # Test API connection based on provider
+            provider = config.get('provider', 'openrouter')
+            
+            if provider == 'openrouter':
+                return self._test_openrouter_config(config)
+            elif provider == 'openai':
+                return self._test_openai_config(config)
+            elif provider == 'anthropic':
+                return self._test_anthropic_config(config)
+            elif provider == 'local':
+                return self._test_local_config(config)
+            else:
+                return {
+                    'status': 'error',
+                    'message': f'Provedor {provider} não suportado'
+                }
+                
+        except Exception as e:
+            logger.error(f"Error testing AI configuration: {str(e)}")
+            return {
+                'status': 'error',
+                'message': f'Erro ao testar configuração: {str(e)}'
+            }
+    
+    def _test_openrouter_config(self, config: Dict) -> Dict:
+        """Test OpenRouter configuration"""
+        try:
+            headers = {
+                "Authorization": f"Bearer {config['api_key']}",
+                "Content-Type": "application/json"
+            }
+            
+            payload = {
+                "model": config.get('model', 'qwen/qwen-2.5-72b-instruct:free'),
+                "messages": [{"role": "user", "content": "test"}],
+                "max_tokens": 10
+            }
+            
+            url = config.get('base_url', 'https://openrouter.ai/api/v1/chat/completions')
+            response = requests.post(url, headers=headers, json=payload, timeout=10)
+            
+            if response.status_code == 200:
+                return {
+                    'status': 'success',
+                    'message': 'Conexão com OpenRouter estabelecida com sucesso'
+                }
+            elif response.status_code == 401:
+                return {
+                    'status': 'error',
+                    'message': 'API Key inválida para OpenRouter'
+                }
+            else:
+                return {
+                    'status': 'error',
+                    'message': f'Erro OpenRouter: {response.status_code}'
+                }
+                
+        except Exception as e:
+            return {
+                'status': 'error',
+                'message': f'Erro de conexão OpenRouter: {str(e)}'
+            }
+    
+    def _test_openai_config(self, config: Dict) -> Dict:
+        """Test OpenAI configuration"""
+        try:
+            headers = {
+                "Authorization": f"Bearer {config['api_key']}",
+                "Content-Type": "application/json"
+            }
+            
+            payload = {
+                "model": config.get('model', 'gpt-3.5-turbo'),
+                "messages": [{"role": "user", "content": "test"}],
+                "max_tokens": 10
+            }
+            
+            url = config.get('base_url', 'https://api.openai.com/v1/chat/completions')
+            response = requests.post(url, headers=headers, json=payload, timeout=10)
+            
+            if response.status_code == 200:
+                return {
+                    'status': 'success',
+                    'message': 'Conexão com OpenAI estabelecida com sucesso'
+                }
+            elif response.status_code == 401:
+                return {
+                    'status': 'error',
+                    'message': 'API Key inválida para OpenAI'
+                }
+            else:
+                return {
+                    'status': 'error',
+                    'message': f'Erro OpenAI: {response.status_code}'
+                }
+                
+        except Exception as e:
+            return {
+                'status': 'error',
+                'message': f'Erro de conexão OpenAI: {str(e)}'
+            }
+    
+    def _test_anthropic_config(self, config: Dict) -> Dict:
+        """Test Anthropic configuration"""
+        try:
+            headers = {
+                "x-api-key": config['api_key'],
+                "Content-Type": "application/json",
+                "anthropic-version": "2023-06-01"
+            }
+            
+            payload = {
+                "model": config.get('model', 'claude-3-haiku-20240307'),
+                "max_tokens": 10,
+                "messages": [{"role": "user", "content": "test"}]
+            }
+            
+            url = config.get('base_url', 'https://api.anthropic.com/v1/messages')
+            response = requests.post(url, headers=headers, json=payload, timeout=10)
+            
+            if response.status_code == 200:
+                return {
+                    'status': 'success',
+                    'message': 'Conexão com Anthropic estabelecida com sucesso'
+                }
+            elif response.status_code == 401:
+                return {
+                    'status': 'error',
+                    'message': 'API Key inválida para Anthropic'
+                }
+            else:
+                return {
+                    'status': 'error',
+                    'message': f'Erro Anthropic: {response.status_code}'
+                }
+                
+        except Exception as e:
+            return {
+                'status': 'error',
+                'message': f'Erro de conexão Anthropic: {str(e)}'
+            }
+    
+    def _test_local_config(self, config: Dict) -> Dict:
+        """Test local AI configuration (Ollama)"""
+        try:
+            base_url = config.get('base_url', 'http://localhost:11434')
+            
+            # Test if Ollama is running
+            response = requests.get(f"{base_url}/api/tags", timeout=5)
+            
+            if response.status_code == 200:
+                models = response.json().get('models', [])
+                model_name = config.get('model', 'llama2')
+                
+                # Check if the model is available
+                available_models = [m['name'] for m in models]
+                if model_name in available_models:
+                    return {
+                        'status': 'success',
+                        'message': f'Ollama conectado. Modelo {model_name} disponível.'
+                    }
+                else:
+                    return {
+                        'status': 'warning',
+                        'message': f'Ollama conectado, mas modelo {model_name} não encontrado. Modelos disponíveis: {", ".join(available_models)}'
+                    }
+            else:
+                return {
+                    'status': 'error',
+                    'message': 'Ollama não está rodando ou não é acessível'
+                }
+                
+        except Exception as e:
+            return {
+                'status': 'error',
+                'message': f'Erro de conexão Ollama: {str(e)}'
+            }
 
 # Global storage instance
 storage = GitHubStorage()
