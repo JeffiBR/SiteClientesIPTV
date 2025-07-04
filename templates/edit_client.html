@@ -105,6 +105,43 @@
                                   rows="3" placeholder="Deixe em branco para usar IA ou digite sua mensagem personalizada...">{{ client.custom_message_payment }}</textarea>
                     </div>
 
+                    <!-- Observations -->
+                    <div class="mb-4">
+                        <h5>
+                            <i class="bi bi-journal-text text-info me-2"></i>
+                            Observações sobre o Cliente
+                        </h5>
+                        <div class="alert alert-warning">
+                            <i class="bi bi-info-circle me-2"></i>
+                            <strong>Histórico Existente:</strong> As observações existentes são preservadas. Use o campo abaixo apenas para adicionar novas observações.
+                        </div>
+                        
+                        <!-- Current Observations Display -->
+                        {% if client.observations %}
+                        <div class="mb-3">
+                            <label class="form-label">Observações Existentes:</label>
+                            <div class="card bg-light">
+                                <div class="card-body">
+                                    <pre class="mb-0 text-wrap">{{ client.observations }}</pre>
+                                </div>
+                            </div>
+                        </div>
+                        {% endif %}
+                        
+                        <!-- New Observation Input -->
+                        <div class="mb-3">
+                            <label for="new_observation" class="form-label">
+                                <i class="bi bi-plus-circle me-2"></i>Nova Observação (Opcional):
+                            </label>
+                            <textarea class="form-control" id="new_observation" name="new_observation" 
+                                      rows="3" placeholder="Digite uma nova observação sobre este cliente..."></textarea>
+                            <div class="form-text">
+                                <i class="bi bi-info-circle me-1"></i>
+                                A nova observação será automaticamente marcada com data e hora
+                            </div>
+                        </div>
+                    </div>
+
                     <!-- Form Actions -->
                     <div class="d-grid gap-2 d-md-flex justify-content-md-end">
                         <a href="{{ url_for('clients') }}" class="btn btn-secondary me-md-2">Cancelar</a>

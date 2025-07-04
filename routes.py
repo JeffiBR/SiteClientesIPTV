@@ -9,10 +9,11 @@ from whatsapp_integration import get_whatsapp_qr_code, is_whatsapp_connected, co
 
 # Importar melhorias implementadas
 from validators import ClientValidator, MessageTemplateValidator, ValidationError
-from rate_limiter import rate_limit_form, rate_limit_api, rate_limit_sensitive, get_client_ip
+from rate_limiter import rate_limiter, get_client_ip
 from logger_config import log_user_action, log_with_context, app_logger, client_logger
 from simple_cache import cache_dashboard_stats, cache_client_list, app_cache, invalidate_cache_pattern
 from backup_utils import create_backup, backup_manager
+from ai_integration import AIMessageGenerator
 import logging
 
 logger = logging.getLogger(__name__)
@@ -113,7 +114,7 @@ def add_client():
     client_ip = get_client_ip()
     
     # Simple rate limiting check
-    if not rate_limit_form(limit=10).is_allowed(client_ip):
+    if not rate_limiter.is_allowed(client_ip, limit=10):
         flash('Muitas tentativas. Aguarde alguns minutos.', 'error')
         return redirect(url_for('clients'))
     
@@ -186,11 +187,19 @@ def edit_client(client_id):
             client.custom_message_3days = request.form.get('custom_message_3days', '')
             client.custom_message_payment = request.form.get('custom_message_payment', '')
             
+            # Handle new observation if provided
+            new_observation = request.form.get('new_observation', '').strip()
+            if new_observation:
+                client.add_observation(new_observation)
+            
             # Save to GitHub
             if storage.update_client(client):
                 # Update scheduler
                 setup_reminders(scheduler)
-                flash('Cliente atualizado com sucesso!', 'success')
+                success_msg = 'Cliente atualizado com sucesso!'
+                if new_observation:
+                    success_msg += ' Nova observação adicionada.'
+                flash(success_msg, 'success')
                 return redirect(url_for('clients'))
             else:
                 flash('Erro ao atualizar cliente no GitHub', 'error')
@@ -208,7 +217,7 @@ def delete_client(client_id):
     client_ip = get_client_ip()
     
     # Rate limiting for sensitive action
-    if not rate_limit_sensitive(limit=5).is_allowed(client_ip):
+    if not rate_limiter.is_allowed(client_ip, limit=5):
         flash('Muitas tentativas de exclusão. Aguarde.', 'error')
         return redirect(url_for('clients'))
     
@@ -254,7 +263,7 @@ def renew_client(client_id):
     client_ip = get_client_ip()
     
     # Rate limiting for form action
-    if not rate_limit_form(limit=20).is_allowed(client_ip):
+    if not rate_limiter.is_allowed(client_ip, limit=20):
         flash('Muitas tentativas de renovação. Aguarde.', 'error')
         return redirect(url_for('clients'))
     
@@ -314,6 +323,52 @@ def renew_client(client_id):
         app_logger.log_error(e, context="client_renewal", 
                            user_ip=client_ip, client_id=client_id)
         flash(f'Erro ao renovar cliente: {str(e)}', 'error')
+
+    return redirect(url_for('clients'))
+
+@app.route('/clients/observations/<client_id>', methods=['POST'])
+def update_client_observations(client_id):
+    """Update client observations"""
+    client_ip = get_client_ip()
+    
+    # Rate limiting for form action
+    if not rate_limiter.is_allowed(client_ip, limit=10):
+        flash('Muitas tentativas. Aguarde.', 'error')
+        return redirect(url_for('clients'))
+    
+    try:
+        client = storage.get_client_by_id(client_id)
+        if not client:
+            flash('Cliente não encontrado', 'error')
+            return redirect(url_for('clients'))
+        
+        new_observation = request.form.get('new_observation', '').strip()
+        if not new_observation:
+            flash('Observação não pode estar vazia', 'error')
+            return redirect(url_for('clients'))
+        
+        # Add the new observation with timestamp
+        client.add_observation(new_observation)
+        
+        # Save to GitHub
+        if storage.update_client(client):
+            # Log observation update
+            client_logger.log_client_action(
+                "observation_added",
+                client.id,
+                client.name,
+                user_ip=client_ip,
+                observation_preview=new_observation[:50] + "..." if len(new_observation) > 50 else new_observation
+            )
+            
+            flash('Observação adicionada com sucesso!', 'success')
+        else:
+            flash('Erro ao salvar observação no GitHub', 'error')
+            
+    except Exception as e:
+        app_logger.log_error(e, context="client_observations", 
+                           user_ip=client_ip, client_id=client_id)
+        flash(f'Erro ao adicionar observação: {str(e)}', 'error')
 
     return redirect(url_for('clients'))
 
@@ -427,6 +482,125 @@ def whatsapp_disconnect():
     flash('WhatsApp desconectado', 'info')
     return redirect(url_for('whatsapp'))
 
+@app.route('/ai/config', methods=['GET', 'POST'])
+def ai_config():
+    """AI Configuration page"""
+    try:
+        if request.method == 'POST':
+            # Save AI configuration
+            ai_config_data = {
+                'provider': request.form.get('provider', 'openrouter'),
+                'api_key': request.form.get('api_key', ''),
+                'model': request.form.get('model', 'qwen/qwen-2.5-72b-instruct:free'),
+                'base_url': request.form.get('base_url', ''),
+                'max_tokens': int(request.form.get('max_tokens', 200)),
+                'temperature': float(request.form.get('temperature', 0.7)),
+                'personality': request.form.get('personality', 'professional'),
+                'custom_personality': request.form.get('custom_personality', ''),
+                'message_style': request.form.get('message_style', 'friendly'),
+                'include_emojis': 'include_emojis' in request.form,
+                'max_message_length': int(request.form.get('max_message_length', 150)),
+                'language': request.form.get('language', 'pt-BR'),
+                'custom_instructions': request.form.get('custom_instructions', ''),
+                'enabled': 'enabled' in request.form,
+                'fallback_to_templates': 'fallback_to_templates' in request.form,
+                'updated_at': datetime.now().isoformat()
+            }
+            
+            if storage.save_ai_configuration(ai_config_data):
+                flash('Configurações de IA salvas com sucesso!', 'success')
+                # Reload AI configuration
+                ai_generator = AIMessageGenerator()
+                ai_generator.load_configuration()
+            else:
+                flash('Erro ao salvar configurações no GitHub', 'error')
+            
+            return redirect(url_for('ai_config'))
+        
+        # Load current configuration
+        config_dict = storage.get_ai_configuration()
+        
+        # Get AI statistics (mock for now)
+        ai_stats = {
+            'messages_generated': 0,
+            'success_rate': '0%'
+        }
+        
+        return render_template('ai_config.html', config=config_dict, ai_stats=ai_stats)
+        
+    except Exception as e:
+        logger.error(f"Error in AI config: {str(e)}")
+        flash('Erro ao carregar configurações de IA', 'error')
+        return redirect(url_for('dashboard'))
+
+@app.route('/ai/test-connection', methods=['POST'])
+def ai_test_connection():
+    """Test AI connection"""
+    try:
+        # Get form data
+        config_data = {
+            'provider': request.form.get('provider', 'openrouter'),
+            'api_key': request.form.get('api_key', ''),
+            'model': request.form.get('model', 'qwen/qwen-2.5-72b-instruct:free'),
+            'base_url': request.form.get('base_url', ''),
+            'max_tokens': int(request.form.get('max_tokens', 200)),
+            'temperature': float(request.form.get('temperature', 0.7)),
+        }
+        
+        # Create temporary AI generator
+        ai_generator = AIMessageGenerator()
+        
+        # Test connection with sample message
+        test_response = ai_generator.test_connection(config_data)
+        
+        if test_response['success']:
+            return jsonify({
+                'success': True,
+                'response': test_response['response']
+            })
+        else:
+            return jsonify({
+                'success': False,
+                'error': test_response['error']
+            })
+            
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        })
+
+@app.route('/ai/generate-preview', methods=['POST'])
+def ai_generate_preview():
+    """Generate preview message for AI config"""
+    try:
+        category = request.form.get('category', 'IPTV')
+        
+        # Sample client data for preview
+        sample_client = {
+            'name': 'João Silva',
+            'plan_type': category,
+            'value': 25.00,
+            'days_remaining': 3
+        }
+        
+        ai_generator = AIMessageGenerator()
+        message = ai_generator.generate_message_for_category(
+            client_data=sample_client,
+            message_type='3days'
+        )
+        
+        return jsonify({
+            'success': True,
+            'message': message
+        })
+        
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        })
+
 @app.route('/api/dashboard-data')
 def api_dashboard_data():
     """API endpoint for dashboard data"""
@@ -526,7 +700,7 @@ def api_cache_stats():
     client_ip = get_client_ip()
     
     # Manual rate limiting
-    if not rate_limit_api(limit=30).is_allowed(client_ip):
+    if not rate_limiter.is_allowed(client_ip, limit=30):
         return jsonify({'error': 'Rate limit exceeded'}), 429
     
     try:
@@ -545,7 +719,7 @@ def api_create_backup():
     client_ip = get_client_ip()
     
     # Manual rate limiting for sensitive action
-    if not rate_limit_sensitive(limit=2).is_allowed(client_ip):
+    if not rate_limiter.is_allowed(client_ip, limit=2):
         return jsonify({'error': 'Rate limit exceeded for backup creation'}), 429
     
     try:
@@ -578,7 +752,7 @@ def api_list_backups():
     client_ip = get_client_ip()
     
     # Manual rate limiting
-    if not rate_limit_api(limit=20).is_allowed(client_ip):
+    if not rate_limiter.is_allowed(client_ip, limit=20):
         return jsonify({'error': 'Rate limit exceeded'}), 429
     
     try:
@@ -666,7 +840,7 @@ def api_vpn_stats():
     client_ip = get_client_ip()
     
     # Rate limiting
-    if not rate_limit_api(limit=30).is_allowed(client_ip):
+    if not rate_limiter.is_allowed(client_ip, limit=30):
         return jsonify({'error': 'Rate limit exceeded'}), 429
     
     try:
@@ -722,7 +896,7 @@ def api_vpn_clients():
     client_ip = get_client_ip()
     
     # Rate limiting
-    if not rate_limit_api(limit=20).is_allowed(client_ip):
+    if not rate_limiter.is_allowed(client_ip, limit=20):
         return jsonify({'error': 'Rate limit exceeded'}), 429
     
     try:
@@ -787,7 +961,7 @@ def api_mobile_dashboard():
     client_ip = get_client_ip()
     
     # Rate limiting
-    if not rate_limit_api(limit=60).is_allowed(client_ip):
+    if not rate_limiter.is_allowed(client_ip, limit=60):
         return jsonify({'error': 'Rate limit exceeded'}), 429
     
     try:
@@ -850,7 +1024,7 @@ def api_revenue_trend():
     client_ip = get_client_ip()
     
     # Rate limiting
-    if not rate_limit_api(limit=10).is_allowed(client_ip):
+    if not rate_limiter.is_allowed(client_ip, limit=10):
         return jsonify({'error': 'Rate limit exceeded'}), 429
     
     try:
@@ -898,7 +1072,7 @@ def api_realtime_updates():
     client_ip = get_client_ip()
     
     # Rate limiting for frequent polling
-    if not rate_limit_api(limit=120).is_allowed(client_ip):
+    if not rate_limiter.is_allowed(client_ip, limit=120):
         return jsonify({'error': 'Rate limit exceeded'}), 429
     
     try:
