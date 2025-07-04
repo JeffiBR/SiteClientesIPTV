@@ -27,6 +27,7 @@ class WhatsAppConnectionStatus:
     CONNECTED = "connected"
     ERROR = "error"
     RECONNECTING = "reconnecting"
+    DEMO_MODE = "demo_mode"  # Added for demo/development mode
 
 class WhatsAppIntegration:
     def __init__(self):
@@ -40,6 +41,7 @@ class WhatsAppIntegration:
         self.webhook_port = None
         self.webhook_running = False
         self.message_sending_enabled = True
+        self.demo_mode = True  # Set to True for development/demo
         self.rate_limit = {
             'messages_per_minute': 20,
             'current_count': 0,
@@ -76,18 +78,20 @@ class WhatsAppIntegration:
                 self.connection_status = content.get('status', WhatsAppConnectionStatus.DISCONNECTED)
                 self.connection_error = content.get('error', None)
                 self.session_id = content.get('session_id', None)
+                self.demo_mode = content.get('demo_mode', True)
                 
-                # Auto-disconnect if last connection was more than 24 hours ago
-                last_updated = content.get('last_updated')
-                if last_updated:
-                    try:
-                        last_time = datetime.fromisoformat(last_updated)
-                        if (datetime.now() - last_time).total_seconds() > 86400:  # 24 hours
-                            logger.info("Connection expired after 24 hours, disconnecting")
-                            self.connection_status = WhatsAppConnectionStatus.DISCONNECTED
-                            self._save_connection_state()
-                    except Exception as e:
-                        logger.warning(f"Error parsing last_updated time: {e}")
+                # Auto-disconnect if last connection was more than 24 hours ago (only for real connections)
+                if not self.demo_mode:
+                    last_updated = content.get('last_updated')
+                    if last_updated:
+                        try:
+                            last_time = datetime.fromisoformat(last_updated)
+                            if (datetime.now() - last_time).total_seconds() > 86400:  # 24 hours
+                                logger.info("Connection expired after 24 hours, disconnecting")
+                                self.connection_status = WhatsAppConnectionStatus.DISCONNECTED
+                                self._save_connection_state()
+                        except Exception as e:
+                            logger.warning(f"Error parsing last_updated time: {e}")
                 
                 return self.connection_status == WhatsAppConnectionStatus.CONNECTED
             return False
@@ -104,6 +108,7 @@ class WhatsAppIntegration:
                 'status': self.connection_status,
                 'error': self.connection_error,
                 'session_id': self.session_id,
+                'demo_mode': self.demo_mode,
                 'last_updated': datetime.now().isoformat(),
                 'connection_attempts': self.connection_attempts,
                 'message_sending_enabled': self.message_sending_enabled
@@ -121,7 +126,7 @@ class WhatsAppIntegration:
             logger.error(f"Error saving WhatsApp connection status: {str(e)}")
 
     def generate_qr_code(self) -> Optional[str]:
-        """Generate QR code for WhatsApp Web connection with error handling"""
+        """Generate QR code for WhatsApp Web connection with improved implementation"""
         try:
             if self.connection_status == WhatsAppConnectionStatus.CONNECTED:
                 logger.info("Already connected to WhatsApp")
@@ -129,25 +134,43 @@ class WhatsAppIntegration:
             
             if not QRCODE_AVAILABLE:
                 logger.error("QR code generation not available - qrcode module not installed")
-                self.connection_error = "QR code module not available"
+                self.connection_error = "QR code module not available. Execute: pip install qrcode[pil]"
                 return None
             
             # Generate unique session ID for QR code
             self.session_id = str(uuid.uuid4())
-            timestamp = datetime.now().isoformat()
+            timestamp = int(datetime.now().timestamp())
             
-            # Real WhatsApp Web connection data
-            # This should integrate with WhatsApp Business API or similar service
-            qr_data = f"whatsapp://connect?session={self.session_id}&timestamp={timestamp}&app=client-manager&v=3.0"
+            if self.demo_mode:
+                # DEMO MODE: Generate informational QR code
+                qr_data = {
+                    "mode": "demo",
+                    "message": "DEMO MODE - Para integração real com WhatsApp:",
+                    "steps": [
+                        "1. Configure WhatsApp Business API",
+                        "2. Obtenha token de acesso",
+                        "3. Configure webhook endpoint",
+                        "4. Desative demo_mode no código"
+                    ],
+                    "docs": "https://developers.facebook.com/docs/whatsapp",
+                    "session": self.session_id,
+                    "timestamp": timestamp
+                }
+                qr_content = json.dumps(qr_data, indent=2, ensure_ascii=False)
+            else:
+                # REAL MODE: This would need actual WhatsApp Business API integration
+                # For now, generate a placeholder that explains the next steps
+                qr_data = f"whatsapp-business://auth?client_id=YOUR_CLIENT_ID&redirect_uri=YOUR_WEBHOOK&scope=messages&state={self.session_id}&timestamp={timestamp}"
+                qr_content = qr_data
             
             try:
                 qr = qrcode.QRCode(
-                    version=1,
+                    version=2,  # Increased version for more data
                     error_correction=qrcode.ERROR_CORRECT_M,
-                    box_size=12,
+                    box_size=10,
                     border=4,
                 )
-                qr.add_data(qr_data)
+                qr.add_data(qr_content)
                 qr.make(fit=True)
                 
                 # Create QR code image with better quality
@@ -161,16 +184,27 @@ class WhatsAppIntegration:
                 img_base64 = base64.b64encode(img_buffer.getvalue()).decode()
                 self.qr_code = f"data:image/png;base64,{img_base64}"
                 
-                # Update status to connecting
-                self.connection_status = WhatsAppConnectionStatus.CONNECTING
-                self.connection_error = None
+                # Update status
+                if self.demo_mode:
+                    self.connection_status = WhatsAppConnectionStatus.DEMO_MODE
+                    self.connection_error = "MODO DEMO: QR code informativo gerado. Para integração real, configure WhatsApp Business API."
+                else:
+                    self.connection_status = WhatsAppConnectionStatus.CONNECTING
+                    self.connection_error = None
+                
                 self._save_connection_state()
                 
                 # Start connection monitoring
                 self._start_connection_monitor()
                 
-                logger.info(f"QR code generated for session: {self.session_id}")
-                logger.info("Scan the QR code with WhatsApp to connect")
+                mode_text = "DEMO" if self.demo_mode else "PRODUCTION"
+                logger.info(f"QR code generated for session: {self.session_id} (Mode: {mode_text})")
+                
+                if self.demo_mode:
+                    logger.info("DEMO MODE: This QR code contains information about WhatsApp integration")
+                else:
+                    logger.info("Scan the QR code with WhatsApp Business to connect")
+                    
                 return self.qr_code
                 
             except Exception as qr_error:
@@ -186,7 +220,23 @@ class WhatsAppIntegration:
             self.connection_status = WhatsAppConnectionStatus.ERROR
             self._save_connection_state()
             return None
-    
+
+    def enable_production_mode(self):
+        """Enable production mode for real WhatsApp integration"""
+        self.demo_mode = False
+        self.connection_status = WhatsAppConnectionStatus.DISCONNECTED
+        self.connection_error = "Production mode enabled. Configure WhatsApp Business API."
+        self._save_connection_state()
+        logger.info("Production mode enabled - WhatsApp Business API integration required")
+
+    def enable_demo_mode(self):
+        """Enable demo mode for development/testing"""
+        self.demo_mode = True
+        self.connection_status = WhatsAppConnectionStatus.DISCONNECTED
+        self.connection_error = None
+        self._save_connection_state()
+        logger.info("Demo mode enabled - using simulated WhatsApp integration")
+
     def check_connection_status(self) -> bool:
         """Check if WhatsApp is connected with comprehensive validation"""
         try:

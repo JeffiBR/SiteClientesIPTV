@@ -1,6 +1,9 @@
 {
-  "status": "disconnected",
-  "error": null,
-  "session_id": null,
-  "last_updated": "2025-07-03T20:27:42.361122"
+  "status": "demo_mode",
+  "error": "MODO DEMO: QR code informativo gerado. Para integração real, configure WhatsApp Business API.",
+  "session_id": "660e0cde-1a5d-4d28-b29e-7141d5d462d0",
+  "demo_mode": true,
+  "last_updated": "2025-07-04T12:57:26.852635",
+  "connection_attempts": 0,
+  "message_sending_enabled": true
 }

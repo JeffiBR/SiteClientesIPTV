@@ -12,6 +12,22 @@
     </div>
 </div>
 
+<!-- Demo Mode Alert -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="alert alert-info border-0" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white;">
+            <div class="d-flex align-items-center">
+                <i class="bi bi-info-circle fs-3 me-3"></i>
+                <div>
+                    <h5 class="mb-1">🚀 MODO DEMONSTRAÇÃO ATIVO</h5>
+                    <p class="mb-2">Este sistema está rodando em modo demo para fins de desenvolvimento e teste. O QR code abaixo contém informações sobre integração real com WhatsApp.</p>
+                    <small><strong>Para produção:</strong> Configure WhatsApp Business API seguindo as instruções no QR code</small>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- Connection Status -->
 <div class="row mb-4">
     <div class="col-12">
@@ -23,15 +39,15 @@
                         {% if connected %}
                             <span class="badge bg-success fs-6">
                                 <i class="bi bi-check-circle"></i>
-                                Conectado
+                                Conectado (DEMO)
                             </span>
-                            <p class="text-muted mt-2">WhatsApp está conectado e pronto para enviar mensagens.</p>
+                            <p class="text-muted mt-2">Sistema em modo demonstração - mensagens são simuladas.</p>
                         {% else %}
-                            <span class="badge bg-danger fs-6">
-                                <i class="bi bi-x-circle"></i>
-                                Desconectado
+                            <span class="badge bg-warning fs-6">
+                                <i class="bi bi-gear"></i>
+                                Modo Demonstração
                             </span>
-                            <p class="text-muted mt-2">Escaneie o QR Code abaixo para conectar o WhatsApp.</p>
+                            <p class="text-muted mt-2">Escaneie o QR Code abaixo para ver informações sobre integração real com WhatsApp.</p>
                         {% endif %}
                     </div>
                     <div>
@@ -39,21 +55,21 @@
                             <form method="POST" action="{{ url_for('whatsapp_disconnect') }}" style="display: inline;">
                                 <button type="submit" class="btn btn-outline-danger">
                                     <i class="bi bi-power"></i>
-                                    Desconectar
+                                    Desconectar Demo
                                 </button>
                             </form>
                         {% else %}
-                            <div class="d-flex gap-2">
+                            <div class="d-flex gap-2 flex-column">
                                 <form method="POST" action="{{ url_for('whatsapp_connect') }}" style="display: inline;">
                                     <div class="form-check mb-2">
-                                        <input class="form-check-input" type="checkbox" id="keepConnected" name="keep_connected" checked>
-                                        <label class="form-check-label" for="keepConnected">
-                                            Manter conectado
+                                        <input class="form-check-input" type="checkbox" id="demoMode" name="demo_mode" checked>
+                                        <label class="form-check-label" for="demoMode">
+                                            Modo Demonstração
                                         </label>
                                     </div>
                                     <button type="submit" class="btn btn-success">
-                                        <i class="bi bi-check-circle"></i>
-                                        Conectar WhatsApp
+                                        <i class="bi bi-play-circle"></i>
+                                        Ativar Demo WhatsApp
                                     </button>
                                 </form>
                             </div>
@@ -68,69 +84,157 @@
 <!-- QR Code Section -->
 {% if not connected and qr_code %}
 <div class="row mb-4">
-    <div class="col-md-6 mx-auto">
+    <div class="col-md-8 mx-auto">
         <div class="card">
-            <div class="card-header text-center">
-                <h5><i class="bi bi-qr-code"></i> QR Code para Conexão</h5>
+            <div class="card-header text-center bg-primary text-white">
+                <h5><i class="bi bi-qr-code"></i> QR Code - Informações de Integração</h5>
             </div>
             <div class="card-body text-center">
                 <div class="mb-3">
-                    <img src="{{ qr_code }}" alt="QR Code WhatsApp" class="img-fluid" style="max-width: 300px;">
+                    <img src="{{ qr_code }}" alt="QR Code WhatsApp Integration Info" class="img-fluid" style="max-width: 350px; border: 3px solid #e3f2fd; border-radius: 10px;">
                 </div>
-                <div class="alert alert-info">
-                    <h6><i class="bi bi-info-circle"></i> Como Conectar:</h6>
+                <div class="alert alert-primary">
+                    <h6><i class="bi bi-info-circle"></i> Como usar este QR Code:</h6>
                     <ol class="text-start">
-                        <li>Abra o WhatsApp no seu celular</li>
-                        <li>Vá em <strong>Configurações > Dispositivos conectados</strong></li>
-                        <li>Toque em <strong>Conectar um dispositivo</strong></li>
-                        <li>Escaneie este QR Code</li>
-                        <li>Clique em "Marcar como Conectado" após escanear</li>
+                        <li>Escaneie com qualquer app de QR code</li>
+                        <li>Veja as instruções detalhadas para integração real</li>
+                        <li>Acesse a documentação oficial do WhatsApp Business API</li>
+                        <li>Configure sua aplicação em produção</li>
                     </ol>
                 </div>
-                <button onclick="window.location.reload()" class="btn btn-outline-primary">
-                    <i class="bi bi-arrow-clockwise"></i>
-                    Atualizar QR Code
-                </button>
+                <div class="d-flex gap-2 justify-content-center">
+                    <button onclick="window.location.reload()" class="btn btn-outline-primary">
+                        <i class="bi bi-arrow-clockwise"></i>
+                        Atualizar QR Code
+                    </button>
+                    <button onclick="showIntegrationGuide()" class="btn btn-info">
+                        <i class="bi bi-book"></i>
+                        Guia de Integração
+                    </button>
+                </div>
             </div>
         </div>
     </div>
 </div>
 {% endif %}
 
+<!-- Integration Guide Modal -->
+<div class="modal fade" id="integrationModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="bi bi-whatsapp text-success"></i>
+                    Guia de Integração WhatsApp Business API
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="accordion" id="integrationAccordion">
+                    <div class="accordion-item">
+                        <h2 class="accordion-header">
+                            <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#step1">
+                                1️⃣ Configuração WhatsApp Business API
+                            </button>
+                        </h2>
+                        <div id="step1" class="accordion-collapse collapse show">
+                            <div class="accordion-body">
+                                <ul>
+                                    <li>Acesse <a href="https://developers.facebook.com/docs/whatsapp" target="_blank">WhatsApp Business API</a></li>
+                                    <li>Crie uma conta no Facebook for Developers</li>
+                                    <li>Configure seu aplicativo e obtenha credenciais</li>
+                                    <li>Verifique seu número de telefone comercial</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="accordion-item">
+                        <h2 class="accordion-header">
+                            <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#step2">
+                                2️⃣ Configuração do Webhook
+                            </button>
+                        </h2>
+                        <div id="step2" class="accordion-collapse collapse">
+                            <div class="accordion-body">
+                                <ul>
+                                    <li>Configure um endpoint público para webhooks</li>
+                                    <li>Implemente verificação de token</li>
+                                    <li>Configure SSL/HTTPS obrigatório</li>
+                                    <li>Teste a conectividade do webhook</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="accordion-item">
+                        <h2 class="accordion-header">
+                            <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#step3">
+                                3️⃣ Modificações no Código
+                            </button>
+                        </h2>
+                        <div id="step3" class="accordion-collapse collapse">
+                            <div class="accordion-body">
+                                <pre><code># No arquivo whatsapp_integration.py
+# Linha ~52: Altere para produção
+self.demo_mode = False
+
+# Configure suas credenciais
+WHATSAPP_TOKEN = "seu_token_aqui"
+WHATSAPP_PHONE_ID = "seu_phone_id"
+WEBHOOK_VERIFY_TOKEN = "seu_verify_token"</code></pre>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>
+                <a href="https://developers.facebook.com/docs/whatsapp/getting-started" target="_blank" class="btn btn-primary">
+                    <i class="bi bi-box-arrow-up-right"></i>
+                    Documentação Oficial
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- Instructions -->
 <div class="row">
     <div class="col-12">
         <div class="card">
             <div class="card-header">
-                <h5><i class="bi bi-info-circle"></i> Informações Importantes</h5>
+                <h5><i class="bi bi-info-circle"></i> Status Atual do Sistema</h5>
             </div>
             <div class="card-body">
                 <div class="row">
                     <div class="col-md-6">
-                        <h6>Recursos Disponíveis:</h6>
+                        <h6>✅ Recursos Funcionais (Demo):</h6>
                         <ul>
-                            <li>Envio automático de lembretes</li>
-                            <li>Mensagens personalizadas por cliente</li>
-                            <li>Agendamento de horários específicos</li>
-                            <li>Integração com dashboard de clientes</li>
+                            <li>Dashboard de clientes completo</li>
+                            <li>Agendamento de lembretes</li>
+                            <li>Templates de mensagens personalizadas</li>
+                            <li>Sistema de renovação automática</li>
+                            <li>Relatórios e estatísticas</li>
+                            <li>Backup automático no GitHub</li>
                         </ul>
                     </div>
                     <div class="col-md-6">
-                        <h6>Requisitos:</h6>
+                        <h6>🔄 Para Produção (Necessário):</h6>
                         <ul>
-                            <li>WhatsApp instalado no celular</li>
-                            <li>Conexão com internet estável</li>
-                            <li>Celular deve permanecer conectado</li>
-                            <li>Número válido para envio de mensagens</li>
+                            <li>Configurar WhatsApp Business API</li>
+                            <li>Obter token de acesso oficial</li>
+                            <li>Configurar webhook público</li>
+                            <li>Verificar número comercial</li>
+                            <li>Desativar modo demo no código</li>
+                            <li>Testar envio real de mensagens</li>
                         </ul>
                     </div>
                 </div>
                 
-                <div class="alert alert-warning mt-3">
-                    <h6><i class="bi bi-exclamation-triangle"></i> Importante:</h6>
+                <div class="alert alert-success mt-3">
+                    <h6><i class="bi bi-check-circle"></i> Importante:</h6>
                     <p class="mb-0">
-                        Mantenha seu celular conectado à internet para que os lembretes sejam enviados corretamente. 
-                        Se a conexão for perdida, será necessário escanear o QR Code novamente.
+                        <strong>O sistema está 100% funcional para gerenciamento de clientes.</strong> Apenas o envio real de mensagens WhatsApp requer configuração da API oficial. 
+                        Todas as outras funcionalidades (cadastro, edição, renovação, relatórios) estão prontas para uso.
                     </p>
                 </div>
             </div>
@@ -138,15 +242,18 @@
     </div>
 </div>
 
-<!-- Test Message Section -->
+<!-- Test Message Section (Demo) -->
 {% if connected %}
 <div class="row mt-4">
     <div class="col-md-8 mx-auto">
-        <div class="card">
-            <div class="card-header">
-                <h5><i class="bi bi-send"></i> Testar Envio de Mensagem</h5>
+        <div class="card border-warning">
+            <div class="card-header bg-warning text-dark">
+                <h5><i class="bi bi-send"></i> Teste de Mensagem (DEMO)</h5>
             </div>
             <div class="card-body">
+                <div class="alert alert-warning">
+                    <strong>Modo Demo:</strong> As mensagens serão simuladas, não enviadas realmente.
+                </div>
                 <form id="testMessageForm">
                     <div class="mb-3">
                         <label for="testPhone" class="form-label">Número de Teste</label>
@@ -159,9 +266,9 @@
                         <textarea class="form-control" id="testMessage" rows="3" 
                                   placeholder="Digite uma mensagem de teste..." required></textarea>
                     </div>
-                    <button type="submit" class="btn btn-primary">
+                    <button type="submit" class="btn btn-warning">
                         <i class="bi bi-send"></i>
-                        Enviar Teste
+                        Simular Envio
                     </button>
                 </form>
             </div>
@@ -173,19 +280,24 @@
 
 {% block scripts %}
 <script>
-    // Auto-refresh QR code every 30 seconds if not connected
+    function showIntegrationGuide() {
+        new bootstrap.Modal(document.getElementById('integrationModal')).show();
+    }
+
+    // Auto-refresh QR code every 60 seconds if not connected
     {% if not connected %}
     setInterval(function() {
         if (!{{ connected|tojson }}) {
             // Only refresh if still on the same page
             if (window.location.pathname === '/whatsapp') {
+                console.log('Refreshing QR code...');
                 window.location.reload();
             }
         }
-    }, 30000);
+    }, 60000);
     {% endif %}
 
-    // Test message form
+    // Test message form (Demo)
     {% if connected %}
     document.getElementById('testMessageForm').addEventListener('submit', function(e) {
         e.preventDefault();
@@ -194,11 +306,32 @@
         const message = document.getElementById('testMessage').value;
         
         // Simulate sending message
-        alert(`Mensagem de teste enviada para ${phone}:\n\n${message}`);
+        Swal.fire({
+            title: 'Mensagem Simulada!',
+            html: `<strong>Para:</strong> ${phone}<br><br><strong>Mensagem:</strong><br>${message}`,
+            icon: 'info',
+            confirmButtonText: 'OK',
+            confirmButtonColor: '#28a745'
+        });
         
         // Clear form
         this.reset();
     });
     {% endif %}
+
+    // Add some animations
+    document.addEventListener('DOMContentLoaded', function() {
+        // Animate cards on load
+        const cards = document.querySelectorAll('.card');
+        cards.forEach((card, index) => {
+            card.style.opacity = '0';
+            card.style.transform = 'translateY(20px)';
+            setTimeout(() => {
+                card.style.transition = 'all 0.5s ease';
+                card.style.opacity = '1';
+                card.style.transform = 'translateY(0)';
+            }, index * 100);
+        });
+    });
 </script>
 {% endblock %}
