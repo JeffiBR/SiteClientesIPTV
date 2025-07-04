@@ -139,7 +139,8 @@ class GitHubStorage:
         except Exception as e:
             logger.error(f"Error getting file content for {filename}: {str(e)}")
             if self.dev_mode:
-                # Fallback para local mesmo em caso de erro
+                # Em modo dev, sempre usar local storage
+                logger.info(f"Using local storage for {filename} in dev mode")
                 return self._get_local_file_content(filename)
             else:
                 raise GitHubStorageError(f"Unexpected error: {str(e)}")
@@ -201,10 +202,18 @@ class GitHubStorage:
                         return None
                     elif response.status_code == 401:
                         logger.error(f"Unauthorized access to {filename} - check GitHub token")
-                        raise GitHubStorageError(f"Unauthorized access to {filename}")
+                        if self.dev_mode:
+                            logger.info(f"GitHub auth failed in dev mode, falling back to local storage for {filename}")
+                            return None  # Let the calling method handle fallback
+                        else:
+                            raise GitHubStorageError(f"Unauthorized access to {filename}")
                     else:
                         logger.error(f"Unexpected status code {response.status_code} for {filename}: {response.text}")
-                        raise GitHubStorageError(f"API error {response.status_code}: {response.text}")
+                        if self.dev_mode:
+                            logger.info(f"GitHub API error in dev mode, falling back to local storage for {filename}")
+                            return None
+                        else:
+                            raise GitHubStorageError(f"API error {response.status_code}: {response.text}")
                         
                 except requests.exceptions.Timeout:
                     logger.warning(f"Timeout on attempt {attempt + 1} for {filename}")
@@ -235,7 +244,8 @@ class GitHubStorage:
         except Exception as e:
             logger.error(f"Error saving file {filename}: {str(e)}")
             if self.dev_mode:
-                # Fallback para local mesmo em caso de erro
+                # Em modo dev, sempre usar local storage
+                logger.info(f"Using local storage to save {filename} in dev mode")
                 return self._save_local_file_content(filename, content)
             else:
                 return False
